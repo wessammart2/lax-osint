@@ -12,7 +12,7 @@ bcrypt==4.2.1
 maigret==0.6.5              # اليوزر نيم (3000+ موقع) — أحدث إصدار متوفر
 holehe==1.61                # الإيميل (120+ موقع)
 duckduckgo-search==8.1.1    # الاسم الكامل
-beautifulsoup4==4.13.4      # استخراج البيانات من صفحات الويب
+beautifulsoup4>=4.14.3,<5   # مطلوب من socid-extractor (تابع maigret)
 
 # PhoneInfoga يُنزَّل كـ binary رسمي في Dockerfile (غير متوفر على PyPI):
 #   github.com/sundowndev/phoneinfoga/releases (v2.11.0 Linux x86_64)
