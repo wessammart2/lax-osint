@@ -11,7 +11,8 @@ bcrypt==4.2.1
 # أدوات البحث (مثبتة تلقائيًا في الصورة)
 maigret==0.6.5              # اليوزر نيم (3000+ موقع) — أحدث إصدار متوفر
 holehe==1.61                # الإيميل (120+ موقع)
-duckduckgo-search==8.1.1    # الاسم الكامل
+duckduckgo-search>=6.0.0    # الاسم الكامل (مع تناوب UA ومحاولة إعادة)
+googlesearch-python>=1.2.0  # محرك احتياطي للاسم الكامل إن حُجب DuckDuckGo
 beautifulsoup4>=4.14.3,<5   # مطلوب من socid-extractor (تابع maigret)
 
 # PhoneInfoga يُنزَّل كـ binary رسمي في Dockerfile (غير متوفر على PyPI):

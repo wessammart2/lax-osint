@@ -39,6 +39,11 @@ MAIGRET_BIN = os.getenv("MAIGRET_BIN", "maigret")
 HOLEHE_BIN = os.getenv("HOLEHE_BIN", "holehe")
 PHONEINFOGA_BIN = os.getenv("PHONEINFOGA_BIN", "phoneinfoga")
 
+# إعدادات البحث بالاسم الكامل
+SEARCH_DELAY = int(os.getenv("SEARCH_DELAY", "2"))          # ثانية بين الطلبات/المحاولات
+USER_AGENT_ROTATION = _bool(os.getenv("USER_AGENT_ROTATION", "true"))
+SEARCH_PROXY = (os.getenv("SEARCH_PROXY") or os.getenv("HTTP_PROXY") or "").strip()
+
 RATE_LIMIT_PER_IP = int(os.getenv("RATE_LIMIT_PER_IP", "20"))  # طلبًا/ساعة/IP
 RATE_LIMIT_WINDOW = 3600      # ثانية
 
