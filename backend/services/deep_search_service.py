@@ -63,13 +63,23 @@ async def deep_search(full_name: str, progress=None) -> dict:
     if progress:
         progress("info", "جارٍ البحث بالاسم الكامل عبر الإنترنت…")
 
+    hits = []
     try:
         with DDGS() as ddgs:
-            hits = list(ddgs.text(full_name, max_results=12))
+            try:
+                hits = list(ddgs.text(full_name, max_results=12))
+            except Exception:
+                # محاولة بديلة عبر واجهة lite (أخفّ على الحصص)
+                hits = list(ddgs.text(full_name, max_results=12, backend="lite"))
     except Exception as e:
         if progress:
             progress("warn", f"بحث DuckDuckGo فشل: {e}")
         return {"results": results, "dossier": dossier}
+
+    if not hits:
+        if progress:
+            progress("warn",
+                     "DuckDuckGo لم يُرجع نتائج (غالبًا تقييد حصص مؤقت من عنوان IP الخادم)")
 
     for hit in hits:
         title = hit.get("title", "")
