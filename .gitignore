@@ -1,0 +1,33 @@
+# ===== Python =====
+backend/.venv/
+__pycache__/
+*.py[cod]
+backend/lax_local.db
+backend/out.log
+backend/err.log
+
+# ===== مفاتيح سرية وبيئات (لا تُرفع أبدًا إلى GitHub!) =====
+.env
+.env.*
+!.env.example
+backend/.env
+*.pem
+*.key
+*.p12
+*.pfx
+*service-account*.json
+secrets.*
+supabase*.json
+
+# ===== Node =====
+node_modules/
+
+# ===== نظام التشغيل / المحرر =====
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
+
+# ===== سجلات =====
+*.log
+logs/

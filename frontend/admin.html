@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAX OSINT — لوحة التحكم</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--red:#FF3B3B;--red-d:#c22020;--bg:#0A0A0A;--bg2:#1A1A1A;--card:#242424;--line:#333;--txt:#f2f2f2;--mut:#9aa0a6;--green:#00FF88;--gold:#FFD700}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font-family:"Cairo",Tahoma,sans-serif;min-height:100vh}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 20px 80px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+h1{font-size:22px;font-weight:900}h1 span{color:var(--red)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:12px;cursor:pointer;border:1px solid var(--line);font-size:14px;font-weight:700;font-family:inherit;color:var(--txt);background:var(--card);transition:transform .12s,box-shadow .2s,background .2s}
+.btn:active{transform:scale(.95)}
+.btn-p{background:var(--red);border-color:var(--red);box-shadow:0 4px 16px rgba(255,59,59,.35)}
+.btn-o{background:transparent;border-color:var(--red);color:var(--red)}
+.btn-g{background:#3a3206;border-color:var(--gold);color:var(--gold)}
+.btn-danger{background:transparent;border-color:var(--red);color:var(--red)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+h2{font-size:16px;margin-bottom:12px;color:var(--red)}
+input{width:100%;padding:12px 14px;border-radius:12px;background:#141414;border:1px solid var(--line);color:var(--txt);font-size:14px;font-family:inherit;outline:none;margin-bottom:10px}
+input:focus{border-color:var(--red)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .grow{flex:1;min-width:150px}
+/* إحصائيات */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
+.stat b{display:block;font-size:26px;color:var(--red);margin-bottom:4px}
+.stat span{font-size:12.5px;color:var(--mut)}
+/* جدول */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 8px;text-align:right;border-bottom:1px solid var(--line);word-break:break-all}
+th{color:var(--mut);font-weight:700;font-size:12px}
+tbody tr:hover{background:#1d1d1d}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800}
+.b-active{color:var(--green);background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.35)}
+.b-used{color:var(--gold);background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.35)}
+.b-expired{color:var(--mut);background:#141414;border:1px solid var(--line)}
+.log{font-size:12px;color:var(--mut);white-space:pre-wrap;font-family:"Inter",monospace}
+.err{color:var(--red);font-size:13px;display:none;margin-bottom:10px}
+.err.show{display:block}
+.toasts{position:fixed;bottom:20px;left:20px;z-index:90;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 18px;border-radius:12px;font-size:13.5px;font-weight:600;background:var(--card);border:1px solid var(--line)}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+.screen{display:none}
+.screen.on{display:block}
+.empty{color:var(--mut);text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ شاشة الدخول ============ -->
+  <div class="screen" id="sc-login">
+    <div class="card" style="max-width:400px;margin:8vh auto">
+      <h1 style="margin-bottom:6px">LAX <span>OSINT</span></h1>
+      <p style="color:var(--mut);font-size:13px;margin-bottom:18px">لوحة تحكم الأدمن — دخول مقيد</p>
+      <div class="err" id="loginErr"></div>
+      <input id="ad-user" placeholder="اسم المستخدم">
+      <input id="ad-pass" type="password" placeholder="كلمة المرور">
+      <button class="btn btn-p" id="ad-login" style="width:100%">دخول</button>
+    </div>
+  </div>
+
+  <!-- ============ لوحة التحكم ============ -->
+  <div class="screen" id="sc-panel">
+    <header>
+      <h1>LAX <span>OSINT</span> — لوحة التحكم</h1>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-o" id="ad-refresh">↻ تحديث</button>
+        <button class="btn btn-danger" id="ad-logout">خروج</button>
+      </div>
+    </header>
+
+    <div class="stats" id="statsRow">
+      <div class="stat"><b id="st-searches">0</b><span>إجمالي البحوث</span></div>
+      <div class="stat"><b id="st-users">0</b><span>المستخدمون</span></div>
+      <div class="stat"><b id="st-codes">0</b><span>الأكواد</span></div>
+      <div class="stat"><b id="st-active">0</b><span>أكواد نشطة</span></div>
+    </div>
+
+    <!-- إنشاء أكواد -->
+    <div class="card">
+      <h2>⚡ إنشاء أكواد Pro</h2>
+      <div class="row" style="align-items:flex-end">
+        <div class="grow"><label style="font-size:12px;color:var(--mut)">عدد الأكواد</label><input id="c-count" type="number" value="5" min="1" max="100"></div>
+        <div class="grow"><label style="font-size:12px;color:var(--mut)">مدة الصلاحية (أيام)</label><input id="c-days" type="number" value="30" min="1" max="365"></div>
+        <div class="grow" style="flex:2;display:flex;flex-direction:column">
+          <label style="font-size:12px;color:var(--mut)">الكود المُنشأ</label>
+          <input id="c-output" readonly placeholder="—">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-g" id="c-gen">توليد</button>
+          <button class="btn btn-o" id="c-copy">نسخ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- جدول الأكواد -->
+    <div class="card">
+      <h2>🗝️ أكواد التفعيل</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>الكود</th><th>الحالة</th><th>المستخدم</th><th>تاريخ التفعيل</th><th>الانتهاء</th><th></th></tr></thead>
+          <tbody id="codesBody"><tr><td colspan="6" class="empty">لا توجد أكواد</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- جدول المستخدمين -->
+    <div class="card">
+      <h2>👥 المستخدمون</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>الإيميل</th><th>برو</th><th>بحوث اليوم</th><th>آخر بحث</th><th></th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="5" class="empty">لا يوجد مستخدمون</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- السجل -->
+    <div class="card">
+      <h2>📜 سجل النشاط</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>الوقت</th><th>الإجراء</th><th>التفاصيل</th><th>IP</th></tr></thead>
+          <tbody id="logsBody"><tr><td colspan="4" class="empty">لا يوجد نشاط</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  var API = (window.LAX_CONFIG && window.LAX_CONFIG.API_URL) || "http://127.0.0.1:8000";
+  var SESSION_H = 24;
+  var $ = function (id) { return document.getElementById(id); };
+
+  var K = { key: "lax_admin_token", at: "lax_admin_login_at" };
+
+  function token() { return localStorage.getItem(K.key) || ""; }
+  function age() {
+    var at = parseInt(localStorage.getItem(K.at) || "0", 10);
+    var h = (Date.now() - at) / 3600000;
+    return isFinite(h) ? h : 1e9;
+  }
+
+  function toast(msg, kind) {
+    var el = document.createElement("div");
+    el.className = "toast " + (kind || "");
+    el.textContent = msg;
+    $("toasts").appendChild(el);
+    setTimeout(function () { el.remove(); }, 3500);
+  }
+
+  function authHeaders(extra) {
+    var h = extra || {};
+    if (token()) h["Authorization"] = "Bearer " + token();
+    h["Content-Type"] = "application/json";
+    return h;
+  }
+
+  function api(path, opts) {
+    return fetch(API + path, opts).then(function (r) {
+      return r.json().then(function (j) {
+        if (r.status === 401) { logout(true); }
+        return j;
+      });
+    });
+  }
+
+  function g(path) {
+    return api(path, { headers: authHeaders() });
+  }
+
+  /* ---------- الشاشات ---------- */
+  function show(name) {
+    document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("on"); });
+    var el = $("sc-" + name);
+    if (el) el.classList.add("on");
+  }
+
+  function checkSession() {
+    if (token() && age() < SESSION_H) { show("panel"); loadAll(); }
+    else { logout(true); }
+  }
+
+  /* ---------- الدخول ---------- */
+  $("ad-login").onclick = function () {
+    var u = $("ad-user").value.trim(), p = $("ad-pass").value;
+    if (!u || !p) { $("loginErr").textContent = "أدخل اسم المستخدم وكلمة المرور"; $("loginErr").classList.add("show"); return; }
+    fetch(API + "/api/admin/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: u, password: p }),
+    }).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+      .then(function (r) {
+        if (r.s === 200 && r.j.ok) {
+          localStorage.setItem(K.key, r.j.token);
+          localStorage.setItem(K.at, String(Date.now()));
+          $("loginErr").classList.remove("show");
+          show("panel"); loadAll();
+          toast("مرحبًا بك في لوحة التحكم", "ok");
+        } else {
+          $("loginErr").textContent = (r.j && r.j.message) || "بيانات الدخول غير صحيحة";
+          $("loginErr").classList.add("show");
+        }
+      });
+  };
+  $("ad-pass").addEventListener("keydown", function (e) { if (e.key === "Enter") $("ad-login").click(); });
+
+  function logout(silent) {
+    localStorage.removeItem(K.key); localStorage.removeItem(K.at);
+    show("login");
+    if (!silent) toast("تم تسجيل الخروج");
+  }
+  $("ad-logout").onclick = function () { logout(); };
+  function onUnauthorized() { logout(true); toast("انتهت الجلسة — أعد تسجيل الدخول", "err"); }
+
+  /* ---------- البيانات ---------- */
+  function loadAll() { loadStats(); loadCodes(); loadUsers(); loadLogs(); }
+
+  function loadStats() {
+    g("/api/admin/stats").then(function (j) {
+      $("st-searches").textContent = j.total_searches || 0;
+      $("st-users").textContent = j.users || 0;
+      $("st-codes").textContent = j.codes || 0;
+      $("st-active").textContent = j.active_codes || 0;
+    }).catch(onUnauthorized);
+  }
+
+  var createdCodes = [];
+
+  function loadCodes() {
+    g("/api/admin/codes").then(function (j) {
+      var body = $("codesBody");
+      var arr = j.codes || [];
+      createdCodes = arr;
+      if (!arr.length) { body.innerHTML = '<tr><td colspan="6" class="empty">لا توجد أكواد</td></tr>'; return; }
+      body.innerHTML = arr.map(function (c) {
+        var badge = c.status === "active" ? "b-active" : c.status === "used" ? "b-used" : "b-expired";
+        var label = c.status === "active" ? "نشط" : c.status === "used" ? "مستخدم" : "منتهي";
+        return "<tr>" +
+          "<td style='font-family:Inter,monospace;direction:ltr'>" + esc(c.code) + "</td>" +
+          '<td><span class="badge ' + badge + '">' + label + "</span></td>" +
+          "<td>" + (c.used_by ? esc(c.used_by) : "—") + "</td>" +
+          "<td>" + (c.activated_at ? esc(c.activated_at.split("T")[0]) : "—") + "</td>" +
+          "<td>" + (c.expires_at ? esc(c.expires_at.split("T")[0]) : "—") + "</td>" +
+          '<td><button class="btn btn-o" style="padding:5px 10px;font-size:12px" data-copy="' + esc(c.code) + '">نسخ</button> ' +
+          '<button class="btn btn-danger" style="padding:5px 10px;font-size:12px" data-del="' + esc(c.id) + '">حذف</button></td></tr>';
+      }).join("");
+      body.querySelectorAll("[data-copy]").forEach(function (b) {
+        b.onclick = function () { copyText(b.getAttribute("data-copy")); };
+      });
+      body.querySelectorAll("[data-del]").forEach(function (b) {
+        b.onclick = function () {
+          if (!confirm("حذف هذا الكود؟")) return;
+          api("/api/admin/codes/" + b.getAttribute("data-del"), { method: "DELETE", headers: authHeaders() })
+            .then(function () { toast("تم حذف الكود", "ok"); loadCodes(); loadStats(); });
+        };
+      });
+    }).catch(onUnauthorized);
+  }
+
+  function loadUsers() {
+    g("/api/admin/users").then(function (j) {
+      var body = $("usersBody");
+      var arr = j.users || [];
+      if (!arr.length) { body.innerHTML = '<tr><td colspan="5" class="empty">لا يوجد مستخدمون</td></tr>'; return; }
+      body.innerHTML = arr.map(function (u) {
+        var badge = u.is_pro ? "b-used" : "b-active";
+        return "<tr>" +
+          "<td>" + esc(u.email) + "</td>" +
+          '<td><span class="badge ' + badge + '">' + (u.is_pro ? "برو ⭐" : "مجاني") + "</span></td>" +
+          "<td>" + (u.searches_today || 0) + " / 4</td>" +
+          "<td>" + (u.last_search_date || "—") + "</td>" +
+          '<td><button class="btn btn-danger" style="padding:5px 10px;font-size:12px" data-uid="' + esc(u.id) + '" data-state="' + (u.disabled ? 0 : 1) + '">' +
+          (u.disabled ? "تفعيل" : "تعطيل") + "</button></td></tr>";
+      }).join("");
+      body.querySelectorAll("[data-uid]").forEach(function (b) {
+        b.onclick = function () {
+          var disable = b.getAttribute("data-state") === "1";
+          api("/api/admin/users/" + b.getAttribute("data-uid") + "/disable?disable=" + disable,
+            { method: "POST", headers: authHeaders() })
+            .then(function () { toast(disable ? "تم تعطيل المستخدم" : "تم تفعيل المستخدم", "ok"); loadUsers(); });
+        };
+      });
+    }).catch(onUnauthorized);
+  }
+
+  function loadLogs() {
+    g("/api/admin/logs").then(function (j) {
+      var body = $("logsBody");
+      var arr = j.logs || [];
+      if (!arr.length) { body.innerHTML = '<tr><td colspan="4" class="empty">لا يوجد نشاط</td></tr>'; return; }
+      body.innerHTML = arr.map(function (l) {
+        var detail = "";
+        try { detail = JSON.stringify(JSON.parse(l.detail || "null")); } catch (e) { detail = l.detail || ""; }
+        if (detail === "null") detail = "";
+        return "<tr>" +
+          "<td style='font-size:11px'>" + esc(l.created_at || "") + "</td>" +
+          "<td>" + esc(l.action || "") + "</td>" +
+          '<td class="log">' + esc(detail) + "</td>" +
+          "<td>" + esc(l.ip || "—") + "</td></tr>";
+      }).join("");
+    }).catch(onUnauthorized);
+  }
+
+  /* ---------- توليد الأكواد ---------- */
+  $("c-gen").onclick = function () {
+    var count = Math.max(1, Math.min(100, parseInt($("c-count").value || "1", 10)));
+    var days = Math.max(1, Math.min(365, parseInt($("c-days").value || "30", 10)));
+    api("/api/admin/codes", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ count: count, duration_days: days }),
+    }).then(function (j) {
+      if (j.codes) {
+        $("c-output").value = j.codes.map(function (c) { return c.code; }).join("\n");
+        toast("تم توليد " + j.codes.length + " كود", "ok");
+        loadCodes(); loadStats();
+      } else if (j.error) {
+        toast(j.message || "فشل التوليد", "err");
+      }
+    });
+  };
+  $("c-copy").onclick = function () { copyText($("c-output").value); };
+  $("ad-refresh").onclick = function () { loadAll(); toast("تم التحديث"); };
+
+  function copyText(text) {
+    if (!text) { toast("لا يوجد نص للنسخ", "err"); return; }
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+      .then(function () { toast("تم النسخ ✓", "ok"); })
+      .catch(function () {
+        var ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); toast("تم النسخ ✓", "ok"); } catch (e) { toast("تعذر النسخ", "err"); }
+        ta.remove();
+      });
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  window.__ADV__ = { loadAll, loadCodes, loadUsers, loadLogs, loadStats };
+  window.addEventListener("DOMContentLoaded", checkSession);
+})();
+</script>
+</body>
+</html>
