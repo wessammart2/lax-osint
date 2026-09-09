@@ -50,7 +50,7 @@ async def _run_cli(email: str, timeout: int = 120) -> str:
     import subprocess
 
     proc = await asyncio.create_subprocess_exec(
-        config.HOLEHE_BIN, email, "--no-color",
+        config.HOLEHE_BIN, email, "--no-color", "--no-clear", "-T", "20",
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
     )
     try:
@@ -67,6 +67,7 @@ async def _run_cli(email: str, timeout: int = 120) -> str:
 #   [x] site.com      -> Rate limit
 RESULT_LINE = re.compile(r"^\[(.)\]\s+(\S+?)\s*$")
 MARK_TO_STATUS = {"+": "registered", "-": "not_registered", "x": "rate_limited"}
+RE_ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def parse_output(text: str, email: str) -> list:
@@ -74,7 +75,7 @@ def parse_output(text: str, email: str) -> list:
     results = []
     seen = set()
     for ln in text.splitlines():
-        ln = ln.strip()
+        ln = RE_ANSI.sub("", ln).strip()
         # نتجاوز سطور شريط التقدم "12%|...|"
         if not ln or ln[0].isdigit() or "|" in ln[:3]:
             continue

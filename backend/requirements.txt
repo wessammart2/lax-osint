@@ -8,10 +8,14 @@ email-validator==2.2.0
 supabase==2.9.0
 bcrypt==4.2.1
 
-# أدوات البحث (اختيارية — تُفعَّل عند تثبيتها فقط)
-# maigret>=0.5.0               # اليوزر نيم (3000+ موقع)
-# holehe>=1.64                # الإيميل (120+ موقع)
-# duckduckgo-search>=7.1.0    # الاسم الكامل
-# beautifulsoup4>=4.12.3
+# أدوات البحث (مثبتة تلقائيًا في الصورة)
+maigret==0.6.5              # اليوزر نيم (3000+ موقع) — أحدث إصدار متوفر
+holehe==1.61                # الإيميل (120+ موقع)
+duckduckgo-search==8.1.1    # الاسم الكامل
+beautifulsoup4==4.13.4      # استخراج البيانات من صفحات الويب
+
+# PhoneInfoga يُنزَّل كـ binary رسمي في Dockerfile (غير متوفر على PyPI):
+#   github.com/sundowndev/phoneinfoga/releases (v2.11.0 Linux x86_64)
+# أدوات إضافية اختيارية (تُفك تعليقها عند الحاجة فقط)
 # playwright>=1.49.1
 # facebook-scraper>=0.3.0

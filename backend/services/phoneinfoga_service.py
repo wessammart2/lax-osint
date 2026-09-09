@@ -34,7 +34,7 @@ async def _run(args: list, timeout: int = 60) -> str:
 
 
 async def search_phone(number: str, progress=None) -> dict:
-    """معلومات فنية عن الرقم + قائمة المنصات (عبر holehe في راوتر الرقم)."""
+    """معلومات فنية عن الرقم (فقط فحص — PhoneInfoga v2 لم يعد يحتوي أمر locate)."""
     ok, msg = available()
     if not ok:
         if progress:
@@ -48,28 +48,46 @@ async def search_phone(number: str, progress=None) -> dict:
     out = await _run(["scan", "-n", number])
     tech["scan"] = parse_scan(out)
 
-    if progress:
-        progress("info", "جارٍ استخراج الموقع الجغرافي للرقم…")
-    loc = await _run(["locate", "-n", number])
-    tech["location"] = parse_location(loc)
+    # PhoneInfoga v2.11 أزال أمر locate — نستخرج البلد من نتائج الفحص مباشرة
+    country = (tech["scan"].get("Country") or "").strip()
+    if country:
+        tech["location"] = {
+            "country": country,
+            "region": tech["scan"].get("region", ""),
+            "city": tech["scan"].get("city", ""),
+            "note": "مستخرج من فحص PhoneInfoga",
+        }
+    else:
+        tech["location"] = {"raw": out[:300] if out else "لا توجد معلومات"}
+
+    links = tech["scan"].get("links") or []
+    if links:
+        tech["links"] = links
 
     return {"number": number, "tech": tech, "note": ""}
 
 
 def parse_scan(text: str) -> dict:
-    """قراءة معلومات الفحص: رمز الدولة، شركة الاتصالات، الصيغة…"""
+    """قراءة معلومات الفحص: رمز الدولة، شركة الاتصالات، الصيغة…
+    صيغة PhoneInfoga v2 (scan): سطور "key: value" + أقسام بها "URL: ..."
+    """
     out = {}
+    links = []
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     for ln in lines:
         m = re.search(r'"([A-Za-z_ ]+)":\s*"?([^",}]+)"?', ln)
         if m:
             out[m.group(1).strip()] = m.group(2).strip()
-    if not out:
-        # صيغة النص: key: value
-        for ln in lines:
-            m = re.search(r"^([A-Za-z_ ]+):\s*(.+)$", ln)
-            if m:
-                out[m.group(1).strip()] = m.group(2).strip()
+            continue
+        m = re.search(r"^([A-Za-z_ ]+):\s*(.+)$", ln)
+        if m:
+            key, val = m.group(1).strip(), m.group(2).strip()
+            if key.lower() == "url":
+                links.append(val)
+            else:
+                out[key] = val
+    if links:
+        out["links"] = links
     return out
 
 

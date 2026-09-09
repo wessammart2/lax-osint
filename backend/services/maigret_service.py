@@ -1,94 +1,61 @@
 """LAX OSINT — خدمة البحث باليوزر نيم عبر Maigret (3000+ موقع)
-التشغيل: subprocess على CLI، مع تفسير مخرجاتها في صيغ متعددة.
+تنفيذ التعليق الرسمي من Maiгret كـ Python library
+(maigret_search في maigret.checking.maigret) — لا يشغّل CLI خارجي.
 """
 import asyncio
-import json
-import os
-import shutil
-import tempfile
+import logging
+from pathlib import Path
 
-import config
+MAIGRET_TOP_SITES = 500   # نفس عدد المواقع الافتراضي للـ CLI (أعلى حركة مرور)
+MAIGRET_TIMEOUT = 20      # ثانية لكل طلب
+
+
+def _logger():
+    lg = logging.getLogger("maigret")
+    lg.setLevel(logging.WARNING)
+    lg.propagate = False
+    if not lg.handlers:
+        lg.addHandler(logging.NullHandler())
+    return lg
+
+
+def _load_database():
+    import maigret
+    from maigret.sites import MaigretDatabase
+
+    db_path = Path(maigret.__file__).resolve().parent / "resources" / "data.json"
+    if not db_path.exists():
+        db_path = Path("maigret/resources/data.json")
+    return MaigretDatabase().load_from_path(str(db_path))
 
 
 def available() -> tuple:
     """تُرجع (متاح, رسالة)."""
-    if shutil.which(config.MAIGRET_BIN):
-        return True, ""
     try:
         import maigret  # noqa: F401
         return True, ""
     except Exception:
         return False, (
-            "Maigret غير مثبت محليًا — شغّل: pip install maigret "
-            "(أو ضع مسار الـ binary في MAIGRET_BIN)"
+            "Maigret غير مثبت — أعد بناء الصورة: pip install maigret"
         )
 
 
-async def _run_cli(username: str, timeout: int = 120) -> tuple:
-    """تشغيل maigret CLI وحفظ التقرير JSON مؤقتًا إن أمكن."""
-    import subprocess
-
-    fd, tmp = tempfile.mkstemp(suffix=".json", prefix="maigret_")
-    os.close(fd)
-    try:
-        # حفظ الخرجJSON في ملف مؤقت (الصيغة المعتمدة: maigret username -o file.json)
-        proc = await asyncio.create_subprocess_exec(
-            config.MAIGRET_BIN, username, "-o", tmp,
-            "-T", "6", "--db", "all",
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-        except asyncio.TimeoutError:
-            proc.kill()
-            return None, "انتهت المهلة أثناء تشغيل Maigret", []
-        if os.path.exists(tmp) and os.path.getsize(tmp) > 0:
-            try:
-                with open(tmp, encoding="utf-8") as f:
-                    report = json.load(f)
-                return report, "", []
-            except Exception:
-                pass
-        # فشل التقرير: نحاول تفسير السطر الأخير من stderr كملخص
-        tail = (stderr or b"").decode("utf-8", "ignore").strip().splitlines()
-        return None, (tail[-1] if tail else "لم يُنتج Maigret أي نتائج"), []
-    finally:
-        try:
-            os.remove(tmp)
-        except Exception:
-            pass
-
-
-async def _run_library(username: str, timeout: int = 120) -> tuple:
-    """الاستخدام البرمجي لحزمة maigret (fallback إن لم يوجد CLI)."""
-    try:
-        import maigret  # noqa: F401
-    except Exception:
-        return None, "", []
-
-    import maigret.api as api
-
-    try:
-        loop = asyncio.get_running_loop()
-        result = await asyncio.wait_for(
-            api.search_username(username, loop=loop), timeout=timeout
-        )
-        # api.search_username تُرجع (found_sites, stars, buckets, errors...)
-        found_sites = result[0] if isinstance(result, tuple) else {}
-        sites = []
-        for name, info in (found_sites or {}).items():
-            if isinstance(info, dict):
-                url = info.get("url_site") or info.get("pretty_site")
-                sites.append({"site": name, "username": username, "url": url or "",
-                              "status": "registered", "tags": info.get("tags", [])})
-        return None, "", sites
-    except Exception as e:
-        return None, str(e), []
+def _ids_summary(ids_data) -> str:
+    """تحويل بيانات socid_extractor (حسابات/معرّفات مرتبطة) إلى سطر مختصر."""
+    if not ids_data or not isinstance(ids_data, dict):
+        return ""
+    fields = []
+    for key in ("usernames", "ids", "emails", "phones", "full_name"):
+        v = ids_data.get(key)
+        if v:
+            vals = ", ".join(str(x) for x in v)[:120]
+            fields.append(f"{key}: {vals}")
+    return " | ".join(fields)
 
 
 async def search_username(username: str, progress=None) -> list:
     """
-    البحث عن اليوزر.
+    البحث عن اليوزر عبر مكتبة Maigret.
     progress: دالة (msg) تُستدعى مع كل رسالة إعلامية.
     تُرجع قائمة نتائج بصيغة موحّدة.
     """
@@ -100,21 +67,80 @@ async def search_username(username: str, progress=None) -> list:
                  "status": "warning", "note": msg}]
 
     if progress:
-        progress("info", "جارٍ فحص يوزر النيم عبر Maigret…")
-    report, err, library_sites = await _run_cli(username)
-    if report is None:
-        if library_sites:
-            return library_sites
-        if progress:
-            progress("warn", err or "Maigret لم يُنتج نتائج")
-        return [{"site": "Maigret", "username": username, "url": "",
-                 "status": "warning", "note": err or "لا نتائج"}]
+        progress("info", f"جارٍ فحص يوزر النيم عبر Maigret ({MAIGRET_TOP_SITES} موقع)…")
+    try:
+        from maigret import search as maigret_search
 
-    return parse_report(report, username)
+        try:
+            db = _load_database()
+            sites = db.ranked_sites_dict(top=MAIGRET_TOP_SITES)
+        except Exception:
+            sites = None
+
+        if not sites:
+            if progress:
+                progress("warn", "تعذّر تحميل قاعدة مواقع Maigret")
+            return [{"site": "Maigret", "username": username, "url": "",
+                     "status": "warning", "note": "تعذّر تحميل قاعدة مواقع Maigret"}]
+
+        if progress:
+            progress("info", f"فُحص {len(sites)} موقع… (قد يستغرق دقيقة)")
+        results = await asyncio.wait_for(
+            maigret_search(
+                username=username,
+                site_dict=sites,
+                logger=_logger(),
+                timeout=MAIGRET_TIMEOUT,
+                is_parsing_enabled=True,
+                max_connections=50,
+                no_progressbar=True,
+            ),
+            timeout=160,
+        )
+    except asyncio.TimeoutError:
+        if progress:
+            progress("warn", "انتهت مهلة Maigret")
+        return [{"site": "Maigret", "username": username, "url": "",
+                 "status": "warning", "note": "انتهت مهلة Maigret (160 ثانية)"}]
+    except Exception as e:
+        if progress:
+            progress("warn", f"Maigret فشل: {e}")
+        return [{"site": "Maigret", "username": username, "url": "",
+                 "status": "error", "note": f"Maigret فشل: {e}"}]
+
+    sites_found = 0
+    out = []
+    for site_name, res in (results or {}).items():
+        if not isinstance(res, dict):
+            continue
+        status_obj = res.get("status")
+        found = bool(getattr(status_obj, "is_found", lambda: False)())
+        if not found:
+            continue
+        sites_found += 1
+        url = res.get("url_user") or res.get("url_auto") or ""
+        ids = _ids_summary(res.get("ids_data"))
+        item = {"site": site_name, "username": username, "url": url,
+                "status": "registered"}
+        tags = res.get("tags")
+        if tags:
+            item["tags"] = tags
+        if ids:
+            item["note"] = ids
+        out.append(item)
+
+    if not out:
+        if progress:
+            progress("warn", "لم يُعثر على حسابات لهذا اليوزر")
+        return [{"site": "Maigret", "username": username, "url": "",
+                 "status": "warning", "note": "لم يُعثر على حسابات مسجَّلة"}]
+    if progress:
+        progress("info", f"عُثر على {sites_found} حسابات مقترنة باليوزر")
+    return out
 
 
 def parse_report(report, username) -> list:
-    """تحويل تقرير Maigret (بصيغته JSON المعروفة) إلى النموذج الموحّد."""
+    """توافق قديم — تحويل تقرير Maigret JSON إلى النموذج الموحّد."""
     sites = []
     if isinstance(report, dict):
         if "results" in report:
@@ -135,7 +161,6 @@ def parse_report(report, username) -> list:
                                       "url": item.get("url", ""),
                                       "status": "registered"})
         else:
-            # صيغة { name: {url_site:..., tags:...} }
             for name, info in report.items():
                 if isinstance(info, dict) and "url_site" in info:
                     sites.append({"site": name, "username": username,
