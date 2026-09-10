@@ -45,12 +45,11 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 HIBP_API_KEY = os.getenv("HIBP_API_KEY", "").strip()
 AI_MODELS = [m.strip() for m in
              os.getenv("AI_MODELS",
-                       "meta-llama/llama-3.1-70b-instruct:free,"
-                       "google/gemma-2-9b-it:free,"
-                       "meta-llama/llama-3.1-70b-instruct,"
-                       "google/gemma-2-9b-it,"
-                       "google/gemma-2-27b-it,"
-                       "meta-llama/llama-3.1-8b-instruct:free")
+                       "meta-llama/llama-3.1-8b-instruct,"
+                       "google/gemma-3-27b-it,"
+                       "qwen/qwen-2.5-72b-instruct,"
+                       "meta-llama/llama-3.3-70b-instruct,"
+                       "openai/gpt-4o-mini")
              .split(",") if m.strip()]
 AI_CACHE_HOURS = int(os.getenv("AI_CACHE_HOURS", "24"))
 AI_PER_USER_HOUR_LIMIT = int(os.getenv("AI_PER_USER_HOUR_LIMIT", "5"))
@@ -60,8 +59,9 @@ AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "90"))
 AI_DEEP_MODELS = [m.strip() for m in
                   os.getenv("AI_DEEP_MODELS",
                             "qwen/qwen-2.5-72b-instruct,"
-                            "qwen/qwen-2.5-coder-32b-instruct,"
-                            "meta-llama/llama-3.1-70b-instruct")
+                            "meta-llama/llama-3.3-70b-instruct,"
+                            "google/gemma-3-27b-it,"
+                            "openai/gpt-4o-mini")
                   .split(",") if m.strip()]
 
 # ---- بحث متقدم (اختياري: يعمل تلقائيًا ما توفرت المفاتيح) ----

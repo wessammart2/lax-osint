@@ -135,7 +135,7 @@ def _openrouter_chat(messages: list, models: list = None) -> tuple:
                     continue
                 if resp.status_code == 429 or resp.status_code >= 500:
                     last_err = f"{model}: HTTP {resp.status_code}"
-                    time.sleep(0.8 * (attempt + 1))
+                    time.sleep(1.5 * (attempt + 1))
                     continue
                 if resp.status_code != 200:
                     # نموذج غير متاح/صلاحية محدودة → جرب النموذج التالي فورًا
