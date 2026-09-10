@@ -98,12 +98,21 @@ def _usage_allowed(uid: str) -> tuple:
 # استدعاء OpenRouter (requests — متزامن، يُشغَّل في thread)
 # ---------------------------------------------------------------------------
 def _openrouter_chat(messages: list, models: list = None) -> tuple:
-    """محاولة عبر نماذج fallback مع retry لكل نموذج. تُرجع (content, model)."""
+    """محاولة عبر نماذج fallback مع retry لكل نموذج. تُرجع (content, model).
+
+    يفرض response_format json_object عند دعم النموذج (استدلال تلقائي: إن رد
+    الخادم 400 يشير لعدم دعم json ردّد الطلب بدونه). الاستجابة لا تُقبل إلا
+    إذا احتوت JSON قابل للتحليل — وإلا نموذج التالي.
+    """
     import requests
 
     last_err = None
     for model in (models or config.AI_MODELS):
         for attempt in range(RETRIES + 1):
+            payload = {"model": model, "messages": messages,
+                       "temperature": 0.2, "max_tokens": MAX_OUTPUT_TOKENS}
+            if attempt == 0:
+                payload["response_format"] = {"type": "json_object"}
             try:
                 resp = requests.post(
                     "https://openrouter.ai/api/v1/chat/completions",
@@ -113,10 +122,17 @@ def _openrouter_chat(messages: list, models: list = None) -> tuple:
                         "HTTP-Referer": _REFERER,
                         "X-Title": _TITLE,
                     },
-                    json={"model": model, "messages": messages,
-                          "temperature": 0.2, "max_tokens": MAX_OUTPUT_TOKENS},
+                    json=payload,
                     timeout=config.AI_REQUEST_TIMEOUT,
                 )
+                body = (resp.text or "")
+                # نموذج لا يدعم json_object → أعد المحاولة بدونه
+                if (resp.status_code == 400 and "json" in body.lower()
+                        and payload.get("response_format")):
+                    payload["response_format"] = None
+                    last_err = f"{model}: json_object unsupported"
+                    time.sleep(0.4)
+                    continue
                 if resp.status_code == 429 or resp.status_code >= 500:
                     last_err = f"{model}: HTTP {resp.status_code}"
                     time.sleep(0.8 * (attempt + 1))
@@ -129,9 +145,7 @@ def _openrouter_chat(messages: list, models: list = None) -> tuple:
                 content = (((data.get("choices") or [{}])[0] or {})
                            .get("message") or {}).get("content") or ""
                 if content.strip():
-                    # نص الاستجابة يجب أن يحوي JSON قابل للتحليل؛ إن لم يحوِه
-                    # نعتبر المحاولة فاشلة ونجرّب النموذج التالي (لا نتوقف أبدًا
-                    # عند نص عشوائي من نموذج واحد).
+                    # مطلوب JSON قابل للتحليل قبل اعتماد الاستجابة.
                     if _extract_json(content):
                         return content.strip(), model
                     last_err = f"{model}: non-JSON response"
@@ -193,7 +207,7 @@ def _build_context(kind: str, query: str, data: dict) -> str:
             {"site": a.get("site"), "name": a.get("name"), "status": a.get("status"),
              "url": a.get("url"), "username": a.get("username"),
              "note": a.get("note"), "avatar": bool(a.get("avatar_url"))}
-            for a in (data.get("accounts") or [])][:120]
+            for a in (data.get("accounts") or [])][:80]
         if data.get("relations"):
             ctx["relations"] = [r for r in data.get("relations") or []][:20]
     for extra_key in ("research", "vuln", "deepweb"):
