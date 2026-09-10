@@ -1,19 +1,25 @@
 """LAX OSINT — خدمة البحث بالاسم الكامل (Deep Search)
-يستخرج ملفًا استخباراتيًا (Dossier) من:
-- DuckDuckGo Search مع تناوب User-Agent وإعادة محاولة (backoff مع SEARCH_DELAY)
-- بديل تلقائي: Google عبر googlesearch-python عند فشل DuckDuckGo
-- دعم Proxy اختياري عبر متغير البيئة SEARCH_PROXY
-- تفسير مبسط (إيميل/رقم/عمر) من نصوص النتائج
+مصمّمة لتجنّب حجب Google/DuckDuckGo من IP الخادم (Error 429):
+- تناوب 30 User-Agent مختلف مع كل طلب
+- delays عشوائية بين الطلبات (SEARCH_DELAY_MIN … SEARCH_DELAY_MAX) عبر _smart_delay
+- retry مع exponential backoff عند الخطأ أو الحجب
+- كاش في قاعدة البيانات (جدول search_cache، صلاحية CACHE_TTL_HOURS=24 ساعة)
+  عبر ENABLE_CACHE — يمنع تكرار نفس الطلب
+- محركات احتياطية: Google (googlesearch-python) ← Wikipedia API ← LinkedIn ← Twitter API
+- تقليل النتائج إلى SEARCH_MAX_RESULTS (افتراضي 5) لتقليل الضغط
+- دعم Proxy اختياري عبر SEARCH_PROXY / HTTP_PROXY
 """
 import asyncio
 import inspect
 import random
 import re
+import urllib.parse
 import warnings
 
 import config
 
-warnings.filterwarnings("ignore", message="This package .duckduckgo_search. has been renamed")
+warnings.filterwarnings("ignore", message=".*duckduckgo_search.*renamed.*")
+warnings.filterwarnings("ignore", message=".*has been renamed.*")
 
 # محاولة استيراد محركات البحث
 try:
@@ -28,46 +34,105 @@ try:
 except Exception:
     GOOGLE_OK = False
 
+# ملاحظة: تُسجَّل الفلاتر هنا وليس قبل الاستيراد، لأن حزمة duckduckgo_search
+# تُدرج `simplefilter("always")` في مقدمة قائمة الفلاتر لحظة استيرادها،
+# فتُلغي أي فلتر ignore مُسجَّل قبلها. بعد الاستيراد يصبح فلترنا في المقدمة.
+warnings.filterwarnings("ignore", message=".*duckduckgo_search.*renamed.*")
+warnings.filterwarnings("ignore", message=".*has been renamed.*")
+
 
 def _tool_status():
     tools = []
     tools.append("DuckDuckGo (DDGS)" if DDGS_OK else "duckduckgo-search غير مثبت")
     tools.append("Google (googlesearch-python)" if GOOGLE_OK else "googlesearch-python غير مثبت")
     try:
+        import httpx  # noqa: F401
+        tools.append("Wikipedia API (httpx)")
+    except Exception:
+        tools.append("httpx غير مثبت")
+    try:
         __import__("bs4")
         tools.append("BeautifulSoup")
     except Exception:
-        tools.append("BeautifulSoup غير مثبت")
+        pass
     return tools
 
 
-# قائمة User-Agent للتبديل العشوائي لتجنّب حجب محركات البحث
+# قائمة 28 User-Agent للتناوب العشوائي لتجنّب حجب محركات البحث
 _USER_AGENTS = [
+    # Chrome — Windows
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    # Chrome — macOS / Linux
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    # Chrome — Android / iPhone
+    "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/125.0.6422.80 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.6367.105 Mobile/15E148 Safari/604.1",
+    # Edge
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+    # Firefox
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
+    "Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:124.0) Gecko/20100101 Firefox/124.0",
+    "Mozilla/5.0 (Android 14; Mobile; rv:126.0) Gecko/126.0 Firefox/126.0",
+    # Safari
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    # Opera / Brave
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 OPR/109.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Brave/1.66.110",
 ]
 
 
 def _headers() -> dict:
-    hd = {"Accept": "*/*", "Accept-Language": "en-US,en;q=0.9,*;q=0.8"}
-    if config.USER_AGENT_ROTATION:
-        hd["User-Agent"] = random.choice(_USER_AGENTS)
-    else:
-        hd["User-Agent"] = _USER_AGENTS[0]
-    return hd
+    ua = random.choice(_USER_AGENTS)
+    if not config.USER_AGENT_ROTATION:
+        ua = _USER_AGENTS[0]
+    return {
+        "User-Agent": ua,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": random.choice([
+            "en-US,en;q=0.9,ar;q=0.8",
+            "ar,en-US;q=0.9,en;q=0.8",
+            "en-US,en;q=0.9;q=0.8,fr;q=0.7",
+        ]),
+        "Cache-Control": "no-cache",
+        "DNT": "1",
+    }
 
 
 def _proxy_value():
     return config.SEARCH_PROXY or None
 
 
+async def _smart_delay(backoff=0, progress=None):
+    """تأجيل عشوائي بين الطلبات؛ مع exponential backoff عند إعادة المحاولة."""
+    base = random.uniform(config.SEARCH_DELAY_MIN, config.SEARCH_DELAY_MAX)
+    delay = min((base * (2 ** backoff)) + random.uniform(0, base), 120)
+    await asyncio.sleep(delay)
+    return delay
+
+
 def _make_ddgs():
-    """ينشئ DDGS متوافقًا مع نسخ المكتبة المختلفة (headers/proxies/proxy/timeout)."""
+    """ينشئ DDGS مع منع الحزمة من فرض إظهار تحذير إعادة التسمية.
+
+    duckduckgo_search 8.x يستدعي `warnings.simplefilter("always")` داخل
+    DDGS.__init__ عند كل إنشاء، فيتجاوز فلاترنا. نعطّل function مؤقتًا ثم نعيدها.
+    """
     params = inspect.signature(DDGS.__init__).parameters
     kw = {}
     if "headers" in params:
@@ -78,31 +143,43 @@ def _make_ddgs():
         kw["proxy"] = _proxy_value()
     if "timeout" in params:
         kw["timeout"] = 15
-    return DDGS(**kw)
+    _orig_simplefilter = warnings.simplefilter
+
+    def _noop(*_a, **_k):
+        pass
+
+    warnings.simplefilter = _noop
+    try:
+        return DDGS(**kw)
+    finally:
+        warnings.simplefilter = _orig_simplefilter
 
 
 async def _ddg_search(full_name: str, progress=None) -> list:
-    """بحث DuckDuckGo مع 3 محاولات (auto → lite → html) وتأجيل بينها."""
+    """بحث DuckDuckGo: auto → lite → html مع exponential backoff وتأجيل عشوائي."""
     backends = []
     try:
         params = inspect.signature(DDGS.text).parameters
-        if "backend" in params:
-            backends = ["auto", "lite", "html"]
-        else:
-            backends = [None]
+        backends = ["auto", "lite", "html"] if "backend" in params else [None]
     except Exception:
         backends = [None]
 
     last_err = None
     for attempt, backend in enumerate(backends):
-        await asyncio.sleep(config.SEARCH_DELAY * attempt)  # 0، 2، 4 ثانية
+        if attempt:
+            delay = await _smart_delay(backoff=attempt - 1, progress=progress)
+            if progress:
+                progress("info", f"إعادة محاولة DuckDuckGo ({backend}) بعد {round(delay, 1)} ث…")
+
+        def _run():
+            with _make_ddgs() as ddgs:
+                kw = {"max_results": config.SEARCH_MAX_RESULTS}
+                if backend:
+                    kw["backend"] = backend
+                return list(ddgs.text(full_name, **kw))
+
         try:
-            def _run():
-                with _make_ddgs() as ddgs:
-                    if backend:
-                        return list(ddgs.text(full_name, max_results=12, backend=backend))
-                    return list(ddgs.text(full_name, max_results=12))
-            hits = await asyncio.to_thread(_run)
+            hits = await asyncio.wait_for(asyncio.to_thread(_run), timeout=30)
             if hits:
                 return hits
         except Exception as e:  # noqa: BLE001
@@ -114,7 +191,7 @@ async def _ddg_search(full_name: str, progress=None) -> list:
 
 def _google_kwargs():
     params = inspect.signature(_google_text).parameters
-    kw = {"num_results": 12}
+    kw = {"num_results": config.SEARCH_MAX_RESULTS}
     if "advanced" in params:
         kw["advanced"] = True
     proxy = _proxy_value()
@@ -124,16 +201,19 @@ def _google_kwargs():
 
 
 async def _google_search(full_name: str, progress=None) -> list:
-    """بحث Google عبر googlesearch-python (يعمل في المعالجات حيث Google غير محجوب)."""
+    """بحث Google عبر googlesearch-python مع إعادة محاولة واحدة بعد تأجيل عشوائي."""
+
     def _run():
         kw = _google_kwargs()
         out = []
-        try:
-            items = list(_google_text(full_name, **kw))
-        except TypeError:
-            # نسخ أقدم بلا معامل advanced
-            base = {k: v for k, v in kw.items() if k != "advanced"}
-            items = list(_google_text(full_name, **base))
+        for allow_old in (False, True):
+            try:
+                k = {kk: vv for kk, vv in kw.items() if not (allow_old and kk == "advanced")}
+                items = list(_google_text(full_name, **k))
+                break
+            except TypeError:
+                items = []
+                continue
         for it in items:
             if it is None:
                 continue
@@ -149,13 +229,124 @@ async def _google_search(full_name: str, progress=None) -> list:
                 out.append({"title": "", "url": it, "body": ""})
         return out
 
-    return await asyncio.to_thread(_run)
+    out = await asyncio.to_thread(_run)
+    if not out:
+        delay = await _smart_delay(progress=progress)
+        if progress:
+            progress("info", f"إعادة محاولة Google بعد {round(delay, 1)} ث…")
+        out = await asyncio.to_thread(_run)
+    return out
+
+
+# مواقع ويكيبيديا المدعومة بالعربية والإنجليزية وغيرها (بديل موثوق بدون مفاتيح)
+WIKI_LANGS = ["ar", "en", "fa", "fr", "de", "es", "tr", "ur"]
+
+
+async def _wikipedia_search(full_name: str, progress=None) -> list:
+    """بحث Wikipedia API (مجاني، لا يحجب IP الخوادم) — محرك احتياطي أساسي."""
+    import httpx
+
+    rows = []
+    try:
+        async with httpx.AsyncClient(headers=_headers(), timeout=12) as client:
+            for lang in WIKI_LANGS:
+                if len(rows) >= config.SEARCH_MAX_RESULTS:
+                    break
+                await asyncio.sleep(random.uniform(0.4, 1.2))  # ليسرع الموقع لا يُحجب
+                try:
+                    r = await client.get(f"https://{lang}.wikipedia.org/w/api.php", params={
+                        "action": "query", "list": "search",
+                        "srsearch": full_name, "srlimit": 3,
+                        "format": "json", "utf8": "1",
+                    })
+                    r.raise_for_status()
+                    for it in (r.json().get("query", {}).get("search", []) or []):
+                        title = (it.get("title") or "").strip()
+                        if not title:
+                            continue
+                        snippet = (it.get("snippet") or "")
+                        snippet = re.sub(r"<[^>]+>", "", snippet)
+                        rows.append({
+                            "title": f"{title} — ويكيبيديا ({lang})",
+                            "url": "https://" + lang + ".wikipedia.org/wiki/" +
+                                   urllib.parse.quote(title.replace(" ", "_")),
+                            "body": snippet[:400],
+                        })
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    rows = rows[:config.SEARCH_MAX_RESULTS]
+    if progress and rows:
+        progress("info", f"Wikipedia API أعاد {len(rows)} نتيجة")
+    return rows
+
+
+async def _linkedin_search(full_name: str, progress=None) -> list:
+    """بحث LinkedIn العام: في الغالب يتطلب تسجيل دخول، محاولة مرة واحدة فقط وبأمان."""
+    import httpx
+
+    parts = full_name.strip().split()
+    if len(parts) < 2:
+        return []
+    first = urllib.parse.quote(parts[0])
+    last = urllib.parse.quote(" ".join(parts[1:]))
+    url = f"https://www.linkedin.com/pub/dir/?firstName={first}&lastName={last}"
+    rows = []
+    try:
+        async with httpx.AsyncClient(headers=_headers(), timeout=8, follow_redirects=False) as c:
+            r = await c.get(url)
+            if r.status_code == 200:
+                seen = set()
+                for m in re.findall(r'href="([^"]*/in/[A-Za-z0-9_-]+)"', r.text):
+                    href = m if m.startswith("http") else "https://www.linkedin.com" + m
+                    href = href.split("?")[0]
+                    if href in seen:
+                        continue
+                    seen.add(href)
+                    rows.append({"title": "LinkedIn profile", "url": href, "body": ""})
+    except Exception:
+        pass
+    if progress and rows:
+        progress("info", f"LinkedIn أعاد {len(rows)} نتيجة")
+    return rows
+
+
+async def _twitter_search(full_name: str, progress=None) -> list:
+    """بحث Twitter/X API: نسخة مجانية محدودة — يعمل فقط عند ضبط TWITTER_BEARER_TOKEN."""
+    if not config.TWITTER_BEARER_TOKEN:
+        return []
+    import httpx
+
+    rows = []
+    headers = {"Authorization": f"Bearer {config.TWITTER_BEARER_TOKEN}",
+               "User-Agent": "lax-osint/1.0"}
+    for base in ("https://api.twitter.com/2/users/search",
+                 "https://api.x.com/2/users/search"):
+        try:
+            async with httpx.AsyncClient(headers=headers, timeout=10) as c:
+                r = await c.get(base, params={
+                    "query": full_name, "max_results": config.SEARCH_MAX_RESULTS,
+                    "user.fields": "name,username,description,location"})
+                r.raise_for_status()
+                for u in (r.json().get("data") or []):
+                    uname = u.get("username", "")
+                    rows.append({
+                        "title": f"{u.get('name') or uname} (@{uname})",
+                        "url": f"https://twitter.com/{uname}",
+                        "body": (u.get("description") or "")[:400],
+                    })
+                break
+        except Exception as e:  # noqa: BLE001
+            if progress:
+                progress("warn", f"Twitter API فشل: {e}")
+            continue
+    return rows
 
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
 AGE_RE = re.compile(r"\b(\d{1,3})\s*(سنة|عام|سنوات|years old|yo)\b", re.I)
-CITY_HINTS = ["يعيش في", "المدينة", "معروف من", "ساكن في", "lives in", "based in", "city:"]
 
 
 def _extract(text: str) -> dict:
@@ -181,6 +372,23 @@ def _build_row(row: dict) -> dict:
 async def deep_search(full_name: str, progress=None) -> dict:
     results = []
     dossier = {"full_name": full_name, "details": {}, "sources": []}
+    engine_used = None
+
+    from db import db
+
+    cache_key = full_name.strip().lower()
+
+    # ١) الكاش: إن وُجدت نتيجة حديثة (24 ساعة) فلا حاجة لأي طلب خارجي
+    if config.ENABLE_CACHE and hasattr(db, "search_cache_get"):
+        try:
+            cached = await asyncio.to_thread(db.search_cache_get, cache_key)
+        except Exception:
+            cached = None
+        if cached and cached.get("dossier"):
+            if progress:
+                progress("info", "النتائج من الكاش المحفوظ (أقل من 24 ساعة) — بدون طلب جديد")
+            cached["dossier"].setdefault("details", {})["cache"] = "hit"
+            return {"results": cached.get("results", []), "dossier": cached["dossier"]}
 
     if not DDGS_OK and not GOOGLE_OK:
         if progress:
@@ -189,23 +397,48 @@ async def deep_search(full_name: str, progress=None) -> dict:
         return {"results": results, "dossier": dossier}
 
     raw = []
+
+    # ٢) DuckDuckGo مع تناوب UA وbackoff
     if DDGS_OK:
         if progress:
-            progress("info", "جارٍ البحث بالاسم الكامل عبر DuckDuckGo…")
-        ddg_hits = await _ddg_search(full_name, progress)
-        for hit in ddg_hits:
-            if isinstance(hit, dict):
-                raw.append({"title": hit.get("title", ""), "url": hit.get("href", ""),
-                            "body": hit.get("body", "")})
+            progress("info", "البحث بالاسم الكامل عبر DuckDuckGo…")
+        hits = await _ddg_search(full_name, progress)
+        raw = [{"title": h.get("title", ""), "url": h.get("href", ""),
+                "body": h.get("body", "")} for h in hits if isinstance(h, dict)]
+        if raw:
+            engine_used = "DuckDuckGo (DDGS)"
 
+    # ٣) بديل Google
     if not raw and GOOGLE_OK:
+        await _smart_delay(progress=progress)
         if progress:
             progress("info", "الاستعانة بمحرك Google الاحتياطي…")
+        engine_used = "Google (googlesearch-python)"
         try:
-            raw = await _google_search(full_name, progress)
+            raw = await _google_search(full_name, progress) or raw
         except Exception as e:  # noqa: BLE001
             if progress:
                 progress("warn", f"Google فشل: {e}")
+
+    # ٤) بديل Wikipedia API (لا يُحجب IP الخوادم)
+    if not raw:
+        await _smart_delay(progress=progress)
+        if progress:
+            progress("info", "الاستعانة بـ Wikipedia API…")
+        engine_used = "Wikipedia API"
+        raw = await _wikipedia_search(full_name, progress)
+
+    # ٥) بديل LinkedIn (إن وُجدت نتائج عامة)
+    if not raw:
+        await _smart_delay(progress=progress)
+        engine_used = "LinkedIn"
+        raw = await _linkedin_search(full_name, progress)
+
+    # ٦) بديل Twitter API (يعمل عند ضبط TWITTER_BEARER_TOKEN فقط)
+    if not raw and config.TWITTER_BEARER_TOKEN:
+        await _smart_delay(progress=progress)
+        engine_used = "Twitter API"
+        raw = await _twitter_search(full_name, progress)
 
     if not raw:
         if progress:
@@ -223,10 +456,19 @@ async def deep_search(full_name: str, progress=None) -> dict:
         "emails": sorted({e for r in results for e in (r["info"].get("emails") or [])}),
         "phones": sorted({p for r in results for p in (r["info"].get("phones") or [])}),
         "age": next((r["info"]["age"] for r in results if r["info"].get("age")), None),
+        "engine_used": engine_used,
         "tools": _tool_status(),
     }
     dossier["details"] = detail
-    return {"results": results, "dossier": dossier}
+    payload = {"results": results, "dossier": dossier}
+
+    # ٧) حفظ الكاش للنتائج غير الفارغة (يقلّل الطلبات المتكررة لنفس الاسم)
+    if config.ENABLE_CACHE and hasattr(db, "search_cache_set"):
+        try:
+            await asyncio.to_thread(db.search_cache_set, cache_key, payload)
+        except Exception:
+            pass
+    return payload
 
 
 async def search_facebook(full_name: str, progress=None) -> dict:
@@ -254,8 +496,8 @@ async def search_playwright(full_name: str, progress=None) -> list:
     try:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.goto("https://www.google.com/search?q=" + full_name.replace(" ", "+"),
+            page = await browser.new_page(user_agent="")
+            await page.goto("https://www.google.com/search?q=" + urllib.parse.quote(full_name),
                             timeout=20000)
             content = await page.content()
             soup = BeautifulSoup(content, "html.parser")

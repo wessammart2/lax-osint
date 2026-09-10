@@ -262,6 +262,38 @@ class SupabaseDatabase:
             pass
 
     # ----------------------------------------------------------
+    #  كاش البحث (جدول search_cache — صلاحية 24 ساعة افتراضيًا)
+    #  يقلّل الطلبات المتكررة لنفس الاسم، فيتجنّب الحجب.
+    # ----------------------------------------------------------
+    def search_cache_get(self, key):
+        """يرجع الـ payload المحفوظ إن وُجد ولم تتجاوز صلاحيته CACHE_TTL_HOURS."""
+        import json
+        try:
+            rows = self._select("search_cache", {"name": str(key)})
+            if not rows:
+                return None
+            row = rows[0]
+            created = _parse_dt(row.get("created_at"))
+            if not created or (_now() - created).total_seconds() > config.CACHE_TTL_HOURS * 3600:
+                return None
+            return json.loads(row.get("result_json") or "null")
+        except Exception:
+            return None
+
+    def search_cache_set(self, key, payload):
+        """يحفظ/يحدّث النتيجة في الجدول (upsert على name)."""
+        try:
+            import json
+            self._admin.table("search_cache").upsert(
+                {"name": str(key),
+                 "result_json": json.dumps(payload, ensure_ascii=False),
+                 "created_at": _now().isoformat()},
+                on_conflict="name").execute()
+            return True
+        except Exception:
+            return False
+
+    # ----------------------------------------------------------
     #  الأدمن
     # ----------------------------------------------------------
     def get_admin(self, username):
