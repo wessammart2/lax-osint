@@ -129,7 +129,14 @@ def _openrouter_chat(messages: list, models: list = None) -> tuple:
                 content = (((data.get("choices") or [{}])[0] or {})
                            .get("message") or {}).get("content") or ""
                 if content.strip():
-                    return content.strip(), model
+                    # نص الاستجابة يجب أن يحوي JSON قابل للتحليل؛ إن لم يحوِه
+                    # نعتبر المحاولة فاشلة ونجرّب النموذج التالي (لا نتوقف أبدًا
+                    # عند نص عشوائي من نموذج واحد).
+                    if _extract_json(content):
+                        return content.strip(), model
+                    last_err = f"{model}: non-JSON response"
+                    time.sleep(0.4 * (attempt + 1))
+                    continue
                 last_err = f"{model}: empty response"
             except Exception as e:  # noqa: BLE001 — شبكة/مهلة
                 last_err = f"{model}: {e}"
@@ -352,18 +359,29 @@ def _normalize_report(report: dict) -> dict:
     return r
 
 
+def _repair_json(t: str):
+    """محاولة إصلاح أخطاء JSON الشائعة من النماذج (فواصل زائدة، نمودج مفقود محتوى)."""
+    import re as _re
+    t = _re.sub(r",\s*([}\]])", r"\1", t)          # فواصل زائدة قبل ] أو }
+    t = _re.sub(r"([{,])\s*([A-Za-z_][A-Za-z0-9_]*)\s*:", r'\1"\2":', t)  # مفاتيح بلا اقتباس
+    t = _re.sub(r"'", '"', t)                       # اقتباسات مفردة → مزدوجة (خام)
+    return t
+
+
 def _extract_json(text: str):
     if not text:
         return None
     t = text.strip()
-    if t.startswith("```"):
+    if t.startswith("```") or t.startswith("```json"):
         t = t.strip("`")
-        if t.startswith("json"):
-            t = t[4:].strip()
+        t = t.replace("json", "", 1).strip() if t.startswith("json") else t
     start, end = t.find("{"), t.rfind("}")
     if start == -1 or end == -1 or end <= start:
         return None
-    try:
-        return json.loads(t[start:end + 1])
-    except Exception:
-        return None
+    frag = t[start:end + 1]
+    for candidate in (frag, _repair_json(frag)):
+        try:
+            return json.loads(candidate)
+        except Exception:
+            continue
+    return None
