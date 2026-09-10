@@ -113,11 +113,6 @@ def _init_local(conn):
           results_count integer not null default 0,
           created_at text not null
         );
-        create table if not exists search_cache (
-          name text primary key,
-          result_json text not null,
-          created_at text not null
-        );
         """
     )
     conn.commit()
@@ -354,41 +349,6 @@ class LocalDB:
         conn.close()
         return {"total_searches": searches["s"], "searches_count": searches["c"],
                 "users": users["c"], "codes": codes["c"], "active_codes": active_codes["c"]}
-
-    # ---------- كاش البحث (جدول search_cache — صلاحية 24 ساعة) ----------
-    def search_cache_get(self, key):
-        import json
-        try:
-            conn = _conn()
-            row = conn.execute(
-                "select result_json, created_at from search_cache where name = ?",
-                (str(key),),
-            ).fetchone()
-            conn.close()
-            if not row:
-                return None
-            created = dt.datetime.fromisoformat(row["created_at"])
-            if (dt.datetime.now(dt.timezone.utc) - created).total_seconds() > config.CACHE_TTL_HOURS * 3600:
-                return None
-            return json.loads(row["result_json"])
-        except Exception:
-            return None
-
-    def search_cache_set(self, key, payload):
-        import json
-        try:
-            conn = _conn()
-            conn.execute(
-                "insert into search_cache (name, result_json, created_at) values (?,?,?) "
-                "on conflict(name) do update set "
-                "result_json = excluded.result_json, created_at = excluded.created_at",
-                (str(key), json.dumps(payload, ensure_ascii=False), _now().isoformat()),
-            )
-            conn.commit()
-            conn.close()
-            return True
-        except Exception:
-            return False
 
 
 # ----------------------------------------------------------

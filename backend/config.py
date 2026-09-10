@@ -39,17 +39,6 @@ MAIGRET_BIN = os.getenv("MAIGRET_BIN", "maigret")
 HOLEHE_BIN = os.getenv("HOLEHE_BIN", "holehe")
 PHONEINFOGA_BIN = os.getenv("PHONEINFOGA_BIN", "phoneinfoga")
 
-# إعدادات البحث بالاسم الكامل — تجنّب حجب Google/DuckDuckGo
-SEARCH_DELAY = int(os.getenv("SEARCH_DELAY", "2"))          # ثانية (توافق قديم)
-SEARCH_DELAY_MIN = max(0, int(os.getenv("SEARCH_DELAY_MIN", "5")))   # حد أدنى للتأجيل العشوائي
-SEARCH_DELAY_MAX = max(SEARCH_DELAY_MIN + 1, int(os.getenv("SEARCH_DELAY_MAX", "10")))
-SEARCH_MAX_RESULTS = max(1, min(20, int(os.getenv("SEARCH_MAX_RESULTS", "5"))))  # تقليل الضغط
-ENABLE_CACHE = _bool(os.getenv("ENABLE_CACHE", "true"))     # كاش النتائج (جدول search_cache)
-CACHE_TTL_HOURS = max(1, int(os.getenv("CACHE_TTL_HOURS", "24")))
-TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN", "").strip()  # اختياري لـ Twitter API
-USER_AGENT_ROTATION = _bool(os.getenv("USER_AGENT_ROTATION", "true"))
-SEARCH_PROXY = (os.getenv("SEARCH_PROXY") or os.getenv("HTTP_PROXY") or "").strip()
-
 RATE_LIMIT_PER_IP = int(os.getenv("RATE_LIMIT_PER_IP", "20"))  # طلبًا/ساعة/IP
 RATE_LIMIT_WINDOW = 3600      # ثانية
 

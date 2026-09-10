@@ -11,10 +11,6 @@
     get log() { return document.getElementById("log"); },
   };
 
-  function hostOf(url) {
-    try { return new URL(url).hostname; } catch (e) { return ""; }
-  }
-
   function letterFor(site) {
     const s = (site || "").replace(/[.-]/g, " ").trim();
     return s ? s[0].toUpperCase() : "?";
@@ -79,47 +75,6 @@
           </div>
         </div>
         <span class="chip ok">•</span>
-      </div>`;
-    },
-    dossier(d) {
-      const det = d.details || {};
-      const emails = det.emails || [];
-      const phones = det.phones || [];
-      const tools = det.tools || [];
-      return `<div class="card dossier">
-        <div class="meta">
-          <div class="site">🕵️ ${t("dossier")} — ${esc(d.full_name)}</div>
-          <div class="d-body">
-            ${det.name_found ? `<div class="kv"><dt>${t("site")}</dt><dd>${esc(det.name_found)}</dd></div>` : ""}
-            ${det.age ? `<div class="kv"><dt>${t("age")}</dt><dd>${esc(det.age)}</dd></div>` : ""}
-            ${emails.length ? `<div class="kv"><dt>${t("emails")}</dt><dd><ul>${emails.map((e) => `<li>${esc(e)}</li>`).join("")}</ul></dd></div>` : ""}
-            ${phones.length ? `<div class="kv"><dt>${t("phones")}</dt><dd><ul>${phones.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></dd></div>` : ""}
-            ${tools && tools.length ? `<div class="kv"><dt>${t("nameTools")}</dt><dd>${esc(tools.join(" · "))}</dd></div>` : ""}
-          </div>
-        </div>
-        <span class="chip warn">${t("dossier")}</span>
-      </div>`;
-    },
-    link(item) {
-      return `<div class="card">
-        <div class="favicon">🔗</div>
-        <div class="meta">
-          <div class="site">${esc(item.title || hostOf(item.url))}</div>
-          <div class="url"><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.url)}</a></div>
-        </div>
-        <span class="chip no">↵</span>
-      </div>`;
-    },
-    facebook(item) {
-      if (!item || !item.name) return "";
-      return `<div class="card avatar-card">
-        ${item.picture ? `<img class="avatar-img" src="${esc(item.picture)}" alt="fb">` : `<div class="favicon">👤</div>`}
-        <div class="meta">
-          <div class="site">Facebook — ${esc(item.name)}</div>
-          ${item.about ? `<div class="url">${esc(item.about)}</div>` : ""}
-          ${item.url ? `<div class="url"><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.url)}</a></div>` : ""}
-        </div>
-        <span class="chip ok">${t("status_registered")}</span>
       </div>`;
     },
     warning(msg) {
