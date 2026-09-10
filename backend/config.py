@@ -53,7 +53,7 @@ AI_MODELS = [m.strip() for m in
              .split(",") if m.strip()]
 AI_CACHE_HOURS = int(os.getenv("AI_CACHE_HOURS", "24"))
 AI_PER_USER_HOUR_LIMIT = int(os.getenv("AI_PER_USER_HOUR_LIMIT", "5"))
-AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "90"))
+AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "70"))
 
 # نماذج Deep Analysis (تبع التحليلات المتقدمة عبر OpenRouter — Qwen)
 AI_DEEP_MODELS = [m.strip() for m in

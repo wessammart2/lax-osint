@@ -33,7 +33,7 @@ _BASE_MAX = 300
 
 MAX_CONTEXT = 16000      # سياق البيانات المُرسلة للنموذج
 MAX_OUTPUT_TOKENS = 2600
-RETRIES = 2               # عدد إعادة المحاولة لكل نموذج
+RETRIES = 1               # عدد إعادة المحاولة لكل نموذج
 
 
 class AIError(Exception):
