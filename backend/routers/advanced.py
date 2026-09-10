@@ -26,7 +26,7 @@ from services import vulnerability_scanner as VS
 from utils import sse_event
 
 LOG = logging.getLogger("advanced")
-router = APIRouter(prefix="/api/advanced", tags=["advanced"])
+router = APIRouter(tags=["advanced"])
 
 KINDS = ("username", "email", "phone")
 
@@ -126,7 +126,7 @@ def _run(kind: str, query: str, base: dict, user_id: str, is_pro: bool):
     return gen()
 
 
-@router.get("")
+@router.get("/advanced")
 async def advanced_search(request: Request, kind: str = Query(...),
                           q: str = Query(...), token: str = Query(...)):
     kind = (kind or "").strip().lower()
