@@ -10,9 +10,15 @@
 - دعم Proxy اختياري عبر SEARCH_PROXY / HTTP_PROXY
 """
 import asyncio
+import hashlib
 import inspect
+import json
+import os
+import pathlib
 import random
 import re
+import tempfile
+import time as _time
 import urllib.parse
 import warnings
 
@@ -117,6 +123,49 @@ def _headers() -> dict:
 
 def _proxy_value():
     return config.SEARCH_PROXY or None
+
+
+# ---------------------------------------------------------------
+#  كاش ملفي محلي (يعمل فورًا بدون الحاجة لجدول Supabase)
+#  الهدف: عدم تكرار نفس الطلب لنفس الاسم خلال CACHE_TTL_HOURS.
+#  عند وجود جدول public.search_cache في Supabase يُستخدم أيضًا ككاش
+#  مشترك/دائم (يعبر إعادة النشر) — هنا طبقة سريعة وموثوقة في /tmp.
+# ---------------------------------------------------------------
+_CACHE_ROOT = pathlib.Path(
+    os.getenv("SEARCH_CACHE_DIR") or os.path.join(tempfile.gettempdir(), "lax_search_cache")
+)
+
+
+def _file_cache_path(key):
+    safe = re.sub(r"[^a-z0-9]+", "_", key.lower())[:60].strip("_")
+    digest = hashlib.md5(key.encode("utf-8")).hexdigest()[:10]
+    return _CACHE_ROOT / f"{safe}_{digest}.json"
+
+
+def _file_cache_get(key):
+    try:
+        p = _file_cache_path(key)
+        if not p.exists():
+            return None
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        if _time.time() - (raw.get("saved_at") or 0) > config.CACHE_TTL_HOURS * 3600:
+            return None
+        return raw.get("payload")
+    except Exception:
+        return None
+
+
+def _file_cache_set(key, payload):
+    try:
+        _CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+        p = _file_cache_path(key)
+        p.write_text(
+            json.dumps({"saved_at": _time.time(), "payload": payload}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return True
+    except Exception:
+        return False
 
 
 async def _smart_delay(backoff=0, progress=None):
@@ -347,12 +396,13 @@ async def _twitter_search(full_name: str, progress=None) -> list:
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(\+?\d[\d\s().-]{7,}\d)")
 AGE_RE = re.compile(r"\b(\d{1,3})\s*(سنة|عام|سنوات|years old|yo)\b", re.I)
+DATE_RE = re.compile(r"^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$")  # استبعاد تواريخ شبيهة بالأرقام
 
 
 def _extract(text: str) -> dict:
     info = {}
     emails = set(EMAIL_RE.findall(text))
-    phones = set(m.strip() for m in PHONE_RE.findall(text))
+    phones = {m.strip() for m in PHONE_RE.findall(text) if not DATE_RE.match(m.strip())}
     if emails:
         info["emails"] = list(emails)[:5]
     if phones:
@@ -379,16 +429,20 @@ async def deep_search(full_name: str, progress=None) -> dict:
     cache_key = full_name.strip().lower()
 
     # ١) الكاش: إن وُجدت نتيجة حديثة (24 ساعة) فلا حاجة لأي طلب خارجي
-    if config.ENABLE_CACHE and hasattr(db, "search_cache_get"):
-        try:
-            cached = await asyncio.to_thread(db.search_cache_get, cache_key)
-        except Exception:
-            cached = None
-        if cached and cached.get("dossier"):
-            if progress:
-                progress("info", "النتائج من الكاش المحفوظ (أقل من 24 ساعة) — بدون طلب جديد")
-            cached["dossier"].setdefault("details", {})["cache"] = "hit"
-            return {"results": cached.get("results", []), "dossier": cached["dossier"]}
+    cached = None
+    if config.ENABLE_CACHE:
+        if hasattr(db, "search_cache_get"):
+            try:
+                cached = await asyncio.to_thread(db.search_cache_get, cache_key)
+            except Exception:
+                cached = None
+        if cached is None:
+            cached = await asyncio.to_thread(_file_cache_get, cache_key)  # كاش /tmp فوري
+    if cached and cached.get("dossier"):
+        if progress:
+            progress("info", "النتائج من الكاش المحفوظ (أقل من 24 ساعة) — بدون طلب جديد")
+        cached["dossier"].setdefault("details", {})["cache"] = "hit"
+        return {"results": cached.get("results", []), "dossier": cached["dossier"]}
 
     if not DDGS_OK and not GOOGLE_OK:
         if progress:
@@ -463,11 +517,16 @@ async def deep_search(full_name: str, progress=None) -> dict:
     payload = {"results": results, "dossier": dossier}
 
     # ٧) حفظ الكاش للنتائج غير الفارغة (يقلّل الطلبات المتكررة لنفس الاسم)
-    if config.ENABLE_CACHE and hasattr(db, "search_cache_set"):
+    if config.ENABLE_CACHE:
         try:
-            await asyncio.to_thread(db.search_cache_set, cache_key, payload)
+            await asyncio.to_thread(_file_cache_set, cache_key, payload)
         except Exception:
             pass
+        if hasattr(db, "search_cache_set"):   # إن وُجد جدول search_cache في Supabase
+            try:
+                await asyncio.to_thread(db.search_cache_set, cache_key, payload)
+            except Exception:
+                pass
     return payload
 
 
