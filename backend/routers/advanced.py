@@ -18,7 +18,6 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from routers.deps import SearchBlocked, require_user
-from routers.search_common import keepalive
 from services import advanced_research as AR
 from services import ai_analysis
 from services import deep_web_search as DW
@@ -149,7 +148,7 @@ async def advanced_search(request: Request, kind: str = Query(...),
                 "note": "أجرِ البحث الأساسي (تحليل شامل) لهذا الهدف أولًا؛ سيكتمل هنا التحليل المتقدم بعد ذلك."}
 
     return StreamingResponse(
-        keepalive(lambda: _run(kind, query, base, str(user["id"]), is_pro)),
+        _run(kind, query, base, str(user["id"]), is_pro),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive",
                  "X-Accel-Buffering": "no"})

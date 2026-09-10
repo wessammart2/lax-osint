@@ -7,7 +7,6 @@
   event: result    {type, data}
   event: done      {count, duration}
 """
-import asyncio
 import time
 
 from fastapi.responses import StreamingResponse
@@ -42,7 +41,7 @@ def stream_response(user, query, search_type, runner, quota, timeout_sec=180):
         try:
             yield sse_event("meta", {"query": query, "search_type": search_type,
                                      "quota": quota})
-            async for name, data in keepalive(lambda: _each(runner())):
+            async for name, data in _each(runner()):
                 if name == "result":
                     count += 1
                 elif name == "done":
@@ -67,46 +66,3 @@ async def _each(async_gen):
             yield item
     except Exception as e:  # noqa: BLE001
         yield ("warn", {"message": f"خطأ أثناء تنفيذ البحث: {e}"})
-
-
-_DONE = object()
-
-
-async def keepalive(agen, interval: int = 4):
-    """يحافظ على حيوية بث SSE أثناء المعالجات الطويلة.
-
-    يرسل حدث heartbeat حقيقي (event: heartbeat) كل بضع ثوانٍ حتى لا تقطع
-    نفق Railway/Traefik الاتصال؛ بعض الوكالات لا تعيد توجيه أسطر التعليق
-    ("...") بينما تعيد توجيه أحداث SSE الحقيقية بموثوقية.
-    """
-    q: asyncio.Queue = asyncio.Queue()
-    inner = agen()
-
-    async def _fill():
-        try:
-            async for item in inner:
-                await q.put(item)
-        finally:
-            await q.put(_DONE)
-
-    task = asyncio.create_task(_fill())
-    last = time.monotonic()
-    try:
-        while True:
-            try:
-                item = await asyncio.wait_for(q.get(), timeout=interval)
-            except asyncio.TimeoutError:
-                if time.monotonic() - last >= interval:
-                    yield sse_event("heartbeat", {"t": int(time.time())})
-                    last = time.monotonic()
-                continue
-            if item is _DONE:
-                break
-            last = time.monotonic()
-            yield item
-    finally:
-        task.cancel()
-        try:
-            await task
-        except (asyncio.CancelledError, Exception):  # noqa: BLE001
-            pass
