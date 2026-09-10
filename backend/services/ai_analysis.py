@@ -27,8 +27,11 @@ _CACHE = {}
 _CACHE_LOCK = threading.Lock()
 _USAGE = {}
 _USAGE_LOCK = threading.Lock()
+# كاش البيانات الأساسية (accounts/tech...) بحيث يقرأها بحث المتقدم من نفس الكاش
+_BASE_CACHE = {}
+_BASE_MAX = 300
 
-MAX_CONTEXT = 10000       # نحصر سياق البيانات المُرسلة للنموذج
+MAX_CONTEXT = 16000      # سياق البيانات المُرسلة للنموذج
 MAX_OUTPUT_TOKENS = 2600
 RETRIES = 2               # عدد إعادة المحاولة لكل نموذج
 
@@ -63,6 +66,21 @@ def _cache_set(key, value):
         _CACHE[key] = (time.time() + config.AI_CACHE_HOURS * 3600, value)
 
 
+def store_base(kind: str, query: str, data: dict):
+    """نسخ البيانات الأساسية للبحث (ليربطها البحث المتقدم بنفس الهدف)."""
+    if not data or not isinstance(data, dict):
+        return
+    with _CACHE_LOCK:
+        _BASE_CACHE[_cache_key(kind, query)] = data
+        while len(_BASE_CACHE) > _BASE_MAX:
+            _BASE_CACHE.pop(next(iter(_BASE_CACHE)), None)
+
+
+def get_base_data(kind: str, query: str) -> dict:
+    with _CACHE_LOCK:
+        return _BASE_CACHE.get(_cache_key(kind, query))
+
+
 def _usage_allowed(uid: str) -> tuple:
     """تسجيل محاولة استخدام؛ تُرجع (allowed, remaining_in_window)."""
     now = time.time()
@@ -79,12 +97,12 @@ def _usage_allowed(uid: str) -> tuple:
 # ---------------------------------------------------------------------------
 # استدعاء OpenRouter (requests — متزامن، يُشغَّل في thread)
 # ---------------------------------------------------------------------------
-def _openrouter_chat(messages: list) -> tuple:
+def _openrouter_chat(messages: list, models: list = None) -> tuple:
     """محاولة عبر نماذج fallback مع retry لكل نموذج. تُرجع (content, model)."""
     import requests
 
     last_err = None
-    for model in config.AI_MODELS:
+    for model in (models or config.AI_MODELS):
         for attempt in range(RETRIES + 1):
             try:
                 resp = requests.post(
@@ -171,6 +189,9 @@ def _build_context(kind: str, query: str, data: dict) -> str:
             for a in (data.get("accounts") or [])][:120]
         if data.get("relations"):
             ctx["relations"] = [r for r in data.get("relations") or []][:20]
+    for extra_key in ("research", "vuln", "deepweb"):
+        if data.get(extra_key):
+            ctx[extra_key] = data[extra_key]
     return _compact(ctx, MAX_CONTEXT)
 
 
@@ -216,13 +237,16 @@ _SYSTEM_PROMPT = (
 )
 
 
-async def generate_report(kind: str, query: str, data: dict, user_id: str = None) -> dict:
-    """توليد التقرير الشامل. تُرجع dict منظمًا دائمًا (حتى عند الفشل)."""
+async def generate_report(kind: str, query: str, data: dict, user_id: str = None,
+                          models: list = None, system_prompt: str = None) -> dict:
+    """توليد التقرير الشامل. تُرجع dict منظمًا دائمًا (حتى عند الفشل).
+    models / system_prompt اختياريتان لتغطية تحليلات خاصة (مثل Qwen العميق)."""
     key = _cache_key(kind, query)
     cached = _cache_get(key)
     if cached:
         return {**cached, "cached": True}
 
+    store_base(kind, query, data)
     ok, msg = available()
     if not ok:
         return {"status": "unavailable", "message": msg}
@@ -236,12 +260,13 @@ async def generate_report(kind: str, query: str, data: dict, user_id: str = None
 
     context = _build_context(kind, query, data)
     messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt or _SYSTEM_PROMPT},
         {"role": "user", "content": "البيانات:\n" + context},
     ]
 
     try:
-        content, used_model = await asyncio.to_thread(_openrouter_chat, messages)
+        content, used_model = await asyncio.to_thread(
+            _openrouter_chat, messages, models)
         report = _extract_json(content)
         if not isinstance(report, dict):
             raise AIError("النموذج لم يُرجع JSON صالحًا")
@@ -254,7 +279,9 @@ async def generate_report(kind: str, query: str, data: dict, user_id: str = None
 
     report["used_model"] = used_model if isinstance(report, dict) else ""
     report["generated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    _cache_set(key, report)
+    # لا نخزّن الفشل في الكاش (يُعاد تم التحليل في المرة القادمة)
+    if isinstance(report, dict) and report.get("status") in ("ok", "limit"):
+        _cache_set(key, report)
     return report
 
 

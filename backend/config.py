@@ -56,6 +56,23 @@ AI_CACHE_HOURS = int(os.getenv("AI_CACHE_HOURS", "24"))
 AI_PER_USER_HOUR_LIMIT = int(os.getenv("AI_PER_USER_HOUR_LIMIT", "5"))
 AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "90"))
 
+# نماذج Deep Analysis (تبع التحليلات المتقدمة عبر OpenRouter — Qwen)
+AI_DEEP_MODELS = [m.strip() for m in
+                  os.getenv("AI_DEEP_MODELS",
+                            "qwen/qwen-2.5-72b-instruct,"
+                            "qwen/qwen-2.5-coder-32b-instruct,"
+                            "meta-llama/llama-3.1-70b-instruct")
+                  .split(",") if m.strip()]
+
+# ---- بحث متقدم (اختياري: يعمل تلقائيًا ما توفرت المفاتيح) ----
+SHODAN_API_KEY = os.getenv("SHODAN_API_KEY", "").strip()
+CENSYS_API_ID = os.getenv("CENSYS_API_ID", "").strip()
+CENSYS_API_SECRET = os.getenv("CENSYS_API_SECRET", "").strip()
+TOR_PROXY = os.getenv("TOR_PROXY", "").strip()   # مثال: socks5h://127.0.0.1:9050
+NUCLEI_BIN = os.getenv("NUCLEI_BIN", "nuclei")
+WHATWEB_BIN = os.getenv("WHATWEB_BIN", "whatweb")
+MONITOR_WEBHOOK = os.getenv("MONITOR_WEBHOOK", "").strip()
+
 # ---- فحص رقم الهاتف في Telegram (اختياري: يتطلب جلسة/session) ----
 TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID", "").strip()
 TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "").strip()

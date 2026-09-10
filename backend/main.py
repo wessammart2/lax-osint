@@ -24,6 +24,19 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api"):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Content-Security-Policy",
+                                    "default-src 'none'; frame-ancestors 'none'")
+    return response
+
+
+@app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     if request.url.path.startswith("/api"):
         ip = request.client.host if request.client else "?"
@@ -40,7 +53,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 # ---------- راوترات ----------
-from routers import auth, pro, admin, username, email, phone, comprehensive  # noqa: E402
+from routers import auth, pro, admin, username, email, phone, comprehensive, advanced  # noqa: E402
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(pro.router, prefix="/api")
@@ -49,6 +62,7 @@ app.include_router(username.router, prefix="/api")
 app.include_router(email.router, prefix="/api")
 app.include_router(phone.router, prefix="/api")
 app.include_router(comprehensive.router, prefix="/api")
+app.include_router(advanced.router, prefix="/api")
 
 
 @app.get("/api/health")

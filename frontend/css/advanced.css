@@ -1,0 +1,62 @@
+/* LAX OSINT — البحث المتقدم
+   =========================
+   عمق التصميم: يتبع نمط البطاقات/الضيافة الحالي مع فروع خاصة بالنتائج
+   العميقة (research / vuln / deepweb / Qwen) + التصدير CSV.
+*/
+
+.adv-btn { color-scheme: light dark; }
+.adv-btn:hover { border-color: var(--accent-2, #7c5cff); color: var(--accent-2, #7c5cff); }
+
+/* عتبة الأقسام */
+.adv-sec { margin-top: 18px; }
+.adv-sub {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 13px; margin: 12px 0 6px;
+  opacity: .85;
+}
+
+/* صفوف الاطلاع */
+.adv-rows {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 300px; overflow-y: auto;
+  padding-inline-end: 4px;
+}
+.adv-row {
+  display: flex; gap: 10px; align-items: center;
+  padding: 8px 10px; border-radius: 8px;
+  background: var(--bg2, #f5f6fa); border: 1px solid var(--line, #e4e6ef);
+  color: inherit; text-decoration: none;
+}
+body.dark .adv-row { background: var(--bg2-dark, #20232e); border-color: var(--line-dark, #33374a); }
+.adv-row:hover { border-color: #7c5cff; }
+.adv-url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; direction: ltr; text-align: start; }
+.adv-dt, .adv-kid { font-size: 11px; font-weight: 700; color: #7c5cff; font-family: var(--mono, "SFMono-Regular", Consolas, monospace); flex: none; }
+.adv-kv { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mono { font-family: var(--mono, "SFMono-Regular", Consolas, monospace); font-size: 12px; direction: ltr; unicode-bidi: embed; }
+
+/* شارات خطورة */
+.sev { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.s-crit { background: #8b0d1b; color: #fff; }
+.s-high { background: #c2410c; color: #fff; }
+.s-med { background: #b45309; color: #fff; }
+.s-low { background: #2563eb; color: #fff; }
+.s-info { background: var(--line, #e4e6ef); color: var(--ink, #222); }
+body.dark .s-info { background: var(--line-dark, #33374a); color: var(--ink-dark, #eee); }
+
+/* نتائج الفحص التفصيلية */
+.adv-detail { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.expo { font-size: 12.5px; line-height: 1.6; }
+.expo-hi { color: #c2410c; font-weight: 600; }
+.expo-hi i { margin-inline-end: 4px; }
+
+/* شارات WiFi */
+.chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip.info { background: var(--line, #e4e6ef); color: var(--ink, #222); }
+
+/* تقرير Qwen */
+.adv-qwen { margin-top: 16px; border: 1px solid #7c5cff44; }
+
+/* تخفيف للطباعة */
+@media print {
+  .adv-rows { max-height: none; overflow: visible; }
+}

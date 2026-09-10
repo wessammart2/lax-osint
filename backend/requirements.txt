@@ -22,8 +22,11 @@ beautifulsoup4>=4.14.3,<5   # مطلوب من socid-extractor (تابع maigret)
 phonenumbers>=9.0,<10.0   # تحليل تقني كامل + علم الدولة (بدون اتصال خارجي)
 requests>=2.31,<3.0       # OpenRouter chat + RDAP WHOIS
 dnspython>=2.6.0          # كشف مزوّد الإيميل عبر سجلات MX (Gmail/Outlook/Yahoo…)
+PySocks>=1.7.1            # وكيل Tor socks5h للبحث العميق في الديب ويب (عند تكوين TOR_PROXY)
 
 # أدوات إضافية اختيارية (تُفك تعليقها عند الحاجة فقط)
+# shodan>=1.29.0          # Shodan API (في حالة مفتاح SHODAN_API_KEY)
+# censys>=2.2.0           # Censys (في حالة CENSYS_API_ID/SECRET)
 # telethon>=1.36.0        # فحص Telegram برقم عبر جلسة (تتطلب TELEGRAM_* في env)
 # playwright>=1.49.1
 # facebook-scraper>=0.3.0
