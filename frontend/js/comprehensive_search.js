@@ -26,6 +26,7 @@
   const els = {
     get status() { return document.getElementById("status"); },
     get statusText() { return document.getElementById("statusText"); },
+    get analyzeBar() { return document.getElementById("analyzeBar"); },
     get log() { return document.getElementById("log"); },
     get list() { return document.getElementById("resultList"); },
     get resWrap() { return document.getElementById("resWrap"); },
@@ -33,6 +34,11 @@
     get resCount() { return document.getElementById("resCount"); },
     get toolbar() { return document.getElementById("compToolbar"); },
   };
+
+  function setAnalyzing(on) {
+    if (!els.analyzeBar) return;
+    els.analyzeBar.classList.toggle("hidden", !on);
+  }
 
   /* ---------- أدوات ---------- */
   function esc(s) {
@@ -158,8 +164,11 @@
       langs += `<li><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> ${t("interests")}: ${esc(ai.interests.join("، "))}</li>`;
     }
 
-    const accounts = (ai.accounts || []).map((a) =>
+    const accounts = (ai.social_accounts || ai.accounts || []).map((a) =>
       `<li class="acc"><a href="${esc(a.url || "#")}" target="_blank" rel="noopener noreferrer">${icHtml(a.platform || a.username)} ${esc(a.platform || a.username || "")}${a.username && a.username !== a.platform ? " — " + esc(a.username) : ""}</a></li>`).join("");
+
+    const chipList = (items) => !items || !items.length ? ""
+      : `<div class="detail-chips">${items.filter(Boolean).map((x) => `<span class="chip ok">${esc(String(x))}</span>`).join("")}</div>`;
 
     const rels = (ai.relationships || []).length
       ? `<div class="section-title"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> ${t("relationsLbl")}</div>
@@ -180,15 +189,20 @@
         ${ai.summary ? `<div class="ai-summary">${esc(ai.summary)}</div>` : ""}
         ${rels}
         <div class="ai-grid">
-          ${field(t("name"), ai.name, "value") || field(t("name"), ai.name && ai.name.value)}
-          ${field(t("age"), ai.age, "value") || field(t("age"), ai.age && ai.age.value)}
-          ${field(t("gender"), ai.gender, "value") || field(t("gender"), ai.gender && ai.gender.value)}
-          ${field(t("location"), ai.location, "value") || field(t("location"), ai.location && ai.location.value)}
-          ${field(t("occupation"), ai.occupation, "value") || field(t("occupation"), ai.occupation && ai.occupation.value)}
-          ${field(t("email"), ai.email && ai.email.value)}
+          ${field(t("fullName"), ai.full_name && ai.full_name.value) || field(t("fullName"), ai.full_name) || field(t("name"), ai.name && ai.name.value) || field(t("name"), ai.name)}
+          ${field(t("birthDate"), ai.birth_date && ai.birth_date.value) || field(t("birthDate"), ai.birth_date)}
+          ${(ai.age_estimate && ai.age_estimate.value) ? field(t("ageEstimate"), ai.age_estimate) : field(t("age"), ai.age && ai.age.value) || field(t("age"), ai.age)}
+          ${field(t("gender"), ai.gender && ai.gender.value) || field(t("gender"), ai.gender)}
+          ${field(t("location"), ai.location && ai.location.value) || field(t("location"), ai.location)}
+          ${(ai.location && (ai.location.city || ai.location.country)) ? `<div class="ai-field"><div class="lbl">${t("cityCountry")}</div><div class="val">${esc([ai.location.city, ai.location.country].filter(Boolean).join(" ، "))}<span class="sub-note">${esc(ai.location.source ? t("source") + ": " + ai.location.source : "")}</span></div></div>` : ""}
+          ${field(t("profession"), ai.profession && ai.profession.value) || field(t("profession"), ai.profession) || field(t("occupation"), ai.occupation && ai.occupation.value) || field(t("occupation"), ai.occupation)}
         </div>
+        ${ai.phone_numbers && ai.phone_numbers.length ? `<div class="section-title"><i class="fa-solid fa-phone" aria-hidden="true"></i> ${t("phoneNumbers")}</div>${chipList(ai.phone_numbers)}` : ""}
+        ${ai.emails && ai.emails.length ? `<div class="section-title"><i class="fa-solid fa-envelope" aria-hidden="true"></i> ${t("emails")}</div>${chipList(ai.emails)}` : ""}
+        ${ai.aliases && ai.aliases.length ? `<div class="section-title"><i class="fa-solid fa-fingerprint" aria-hidden="true"></i> ${t("aliases")}</div>${chipList(ai.aliases)}` : ""}
         ${langs ? `<ul class="tag-list">${langs}</ul>` : ""}
         ${accounts ? `<div class="section-title"><i class="fa-solid fa-user-tie" aria-hidden="true"></i> ${t("accountsLbl")}</div><ul class="tag-list">${accounts}</ul>` : ""}
+        ${ai.extra_info ? `<div class="note-msg"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> ${esc(ai.extra_info)}</div>` : ""}
         ${ai.personal_note ? `<div class="note-msg"><i class="fa-solid fa-note-sticky" aria-hidden="true"></i> ${esc(ai.personal_note)}</div>` : ""}
         ${timeline}
         <div class="risk-wrap ${riskCls}">
@@ -203,13 +217,14 @@
   function accountGrid(list, opts) {
     if (!list || !list.length) return "";
     const cards = list.map((it) => {
-      const site = it.site || it.name || it.platform || t("unknown");
+      const site = it.label || it.site || it.name || it.platform || t("unknown");
+      const key = it.platform || platformOf(site);
       const url = it.url || "";
       const st = it.status || "registered";
       return `<div class="card site-card ok-comp">
         ${avatarHtml(it)}
         <div style="display:flex;align-items:center;">
-          ${faIcon(site) ? `<i class="${faIcon(site)} plat-ic" aria-hidden="true"></i>` : `<div class="plat-icon letter">${letterFor(site)}</div>`}
+          ${faIcon(key) ? `<i class="${faIcon(key)} plat-ic" aria-hidden="true"></i>` : `<div class="plat-icon letter">${letterFor(site)}</div>`}
         </div>
         <div class="meta">
           <div class="site">${esc(site)}</div>
@@ -236,6 +251,8 @@
         <div class="site"><i class="fa-solid fa-envelope" aria-hidden="true"></i> ${esc(d.email)}</div>
         <div class="d-body">
           <div class="kv"><dt>${t("domainLbl")}</dt><dd>${esc(d.domain || "")}</dd></div>
+          ${(d.provider && d.provider.name) ? `<div class="kv"><dt>${t("emailProvider")}</dt><dd><i class="fa-solid fa-server" aria-hidden="true"></i> ${esc(d.provider.name)}</dd></div>` : ""}
+          <div class="kv"><dt>${t("platformsChecked")}</dt><dd><span class="chip ok" style="margin:0">${esc(String(s.platforms_checked || 121))} ${t("platformsCheckedUnit")}</span></dd></div>
           <div class="kv"><dt>${Lx("count")}</dt><dd>${esc(String(s.accounts_count))}</dd></div>
           <div class="kv"><dt>${t("platformsFoundLbl")}</dt><dd>${(s.platforms_found || []).slice(0, 10).map((x) => `<span class="chip ok" style="margin:2px">${esc(x)}</span>`).join(" ") || "—"}</dd></div>
         </div>
@@ -340,6 +357,7 @@
     els.log.classList.remove("hidden");
     els.status.classList.add("show");
     els.statusText.textContent = t("searching");
+    setAnalyzing(true);
 
     const store = window.laxAuth.store;
     const url = `${API}/api/comprehensive/${type}?q=${encodeURIComponent(query)}&token=${encodeURIComponent(store.token)}`;
@@ -378,6 +396,7 @@
     } catch (e) { /* انقطاع */ }
     finally {
       els.status.classList.remove("show");
+      setAnalyzing(false);
       if (els.resCounter) els.resCounter.classList.add("done");
       if (btn) btn.disabled = false;
       busy = false;
@@ -428,8 +447,9 @@
       html += `<div class="note-msg"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> ${esc(data.message || data.error)}</div>`;
     } else {
       if (data.ai) {
-        if (data.ai.summary || data.ai.name) html += aiPanel(data.ai);
-        else if (data.ai.status) html += aiPanel(data.ai);
+        if (data.ai.summary || data.ai.name || data.ai.full_name || data.ai.email ||
+            data.ai.phone_numbers || data.ai.social_accounts || data.ai.aliases ||
+            data.ai.extra_info || data.ai.status) html += aiPanel(data.ai);
       }
       if (data.kind === "username") html += renderUsername(data);
       else if (data.kind === "email") html += renderEmail(data);
@@ -446,6 +466,7 @@
 
   function fail(msg) {
     els.status.classList.remove("show");
+    setAnalyzing(false);
     if (els.resCounter) els.resCounter.classList.add("done");
     els.list.insertAdjacentHTML("beforeend", `<div class="note-msg"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> ${esc(msg)}</div>`);
   }

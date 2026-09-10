@@ -45,7 +45,10 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 HIBP_API_KEY = os.getenv("HIBP_API_KEY", "").strip()
 AI_MODELS = [m.strip() for m in
              os.getenv("AI_MODELS",
-                       "meta-llama/llama-3-70b-instruct,"
+                       "meta-llama/llama-3.1-70b-instruct:free,"
+                       "google/gemma-2-9b-it:free,"
+                       "meta-llama/llama-3.1-70b-instruct,"
+                       "google/gemma-2-9b-it,"
                        "google/gemma-2-27b-it,"
                        "meta-llama/llama-3.1-8b-instruct:free")
              .split(",") if m.strip()]

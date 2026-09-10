@@ -242,6 +242,45 @@
 /* ---------- غلاف الطباعة ---------- */
 #printArea { display: block; }
 
+/* ---------- شريط تحميل التحليل الشامل ---------- */
+.analyze-bar {
+  height: 4px;
+  margin: 0 auto 12px;
+  max-width: 420px;
+  background: #1c1c1c;
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.analyze-bar.hidden { display: none; }
+.analyze-bar span {
+  position: absolute;
+  left: 0; top: 0; height: 100%; width: 36%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--red, #ff3b3b), var(--gold, #ffc107), var(--red, #ff3b3b));
+  background-size: 200% 100%;
+  animation: analyzeSlide 1.2s ease-in-out infinite;
+}
+@keyframes analyzeSlide {
+  0%   { left: -36%; }
+  100% { left: 100%; }
+}
+
+/* ---------- حقول الأرقام/الإيميلات/الأسماء المستعارة ---------- */
+.detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+.detail-chips .chip {
+  font-size: 13px;
+  font-weight: 700;
+  direction: ltr;
+  unicode-bidi: embed;
+  word-break: break-all;
+}
+
 @media print {
   body { background: #fff !important; }
   .site, #status, .toast, .comp-toolbar, #btnExportJson, #btnExportPdf,

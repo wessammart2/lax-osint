@@ -28,8 +28,8 @@ _CACHE_LOCK = threading.Lock()
 _USAGE = {}
 _USAGE_LOCK = threading.Lock()
 
-MAX_CONTEXT = 6000        # نحصر سياق البيانات المُرسلة للنموذج
-MAX_OUTPUT_TOKENS = 1800
+MAX_CONTEXT = 10000       # نحصر سياق البيانات المُرسلة للنموذج
+MAX_OUTPUT_TOKENS = 2600
 RETRIES = 2               # عدد إعادة المحاولة لكل نموذج
 
 
@@ -144,13 +144,14 @@ def _build_context(kind: str, query: str, data: dict) -> str:
         ctx["gravatar"] = _json_subset(data.get("gravatar") or {},
                                        ("available", "name", "about"))
         ctx["accounts"] = [
-            _json_subset(a, ("site", "name", "status", "url", "username", "note"))
-            for a in (data.get("accounts") or [])][:40]
+            _json_subset(a, ("site", "name", "status", "url", "username", "note",
+                             "aliases", "profile_name"))
+            for a in (data.get("accounts") or [])][:80]
         breaches_raw = data.get("breaches") or []
         if not isinstance(breaches_raw, list):
             breaches_raw = (breaches_raw or {}).get("items") or []
         ctx["breaches"] = [{"name": b.get("name"), "date": b.get("date"),
-                            "pwned": b.get("pwned")} for b in breaches_raw][:15]
+                            "pwned": b.get("pwned")} for b in breaches_raw][:25]
         ctx["whois"] = _json_subset(data.get("whois") or {},
                                     ("domain", "registrar", "created", "expires", "statuses"))
     elif kind == "phone":
@@ -165,35 +166,53 @@ def _build_context(kind: str, query: str, data: dict) -> str:
     elif kind == "username":
         ctx["accounts"] = [
             {"site": a.get("site"), "name": a.get("name"), "status": a.get("status"),
-             "url": a.get("url"), "username": a.get("username"), "avatar": bool(a.get("avatar_url"))}
-            for a in (data.get("accounts") or [])][:60]
+             "url": a.get("url"), "username": a.get("username"),
+             "note": a.get("note"), "avatar": bool(a.get("avatar_url"))}
+            for a in (data.get("accounts") or [])][:120]
+        if data.get("relations"):
+            ctx["relations"] = [r for r in data.get("relations") or []][:20]
     return _compact(ctx, MAX_CONTEXT)
 
 
 _SYSTEM_PROMPT = (
-    "أنت محلل استخبارات مصادر مفتوحة (OSINT) محترف. حللّ البيانات الواردة وأخرج "
-    "تقريرًا منظمًا بـ JSON فقط (بدون أي نص خارج JSON). المخطط المطلوب حرفيًا:\n"
+    "You are a professional Open-Source Intelligence (OSINT) analyst. "
+    "Analyze the provided intelligence data (extracted from  Datos such as "
+    "Maigret/ holehe / PhoneInfoga / searches) and extract every available "
+    "personal detail about the target person.\n"
+    "Return STRICTLY one JSON object (no text, no markdown, no comments) "
+    "matching this EXACT schema:\n"
     "{\n"
-    "  \"summary\": \"ملخص عربي قصير عن الهدف\",\n"
-    "  \"name\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
-    "  \"age\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
+    "  \"full_name\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
+    "  \"birth_date\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
+    "  \"age_estimate\": {\"value\": null, \"confidence\": 0, \"source\": \"\"},\n"
     "  \"gender\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
-    "  \"location\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
+    "  \"location\": {\"value\": \"\", \"city\": \"\", \"country\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
+    "  \"phone_numbers\": [],\n"
+    "  \"emails\": [],\n"
+    "  \"aliases\": [],\n"
+    "  \"social_accounts\": [{\"platform\": \"\", \"username\": \"\", \"url\": \"\"}],\n"
+    "  \"profession\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
     "  \"languages\": [],\n"
     "  \"interests\": [],\n"
-    "  \"occupation\": {\"value\": \"\", \"confidence\": 0, \"source\": \"\"},\n"
-    "  \"accounts\": [{\"platform\": \"\", \"username\": \"\", \"url\": \"\"}],\n"
     "  \"relationships\": [{\"related_to\": \"\", \"how\": \"\"}],\n"
-    "  \"personal_note\": \"ملاحظات شخصية متبقية\",\n"
+    "  \"extra_info\": \"\",\n"
     "  \"timeline\": [{\"date\": \"\", \"event\": \"\"}],\n"
     "  \"risk_score\": 0,\n"
     "  \"risk_level\": \"low\"\n"
     "}\n"
-    "قواعد: confidence بين 0 و100. source = من أين استُنتجت (منصة/تسريب/تخمين منطقي).\n"
-    "risk_score بين 0 و100، وrisk_level أحد: low|medium|high.\n"
-    "إن لم توجد معلومة في البيانات ضع قيمة فارغة وثقة 0 — لا تخترع أبدًا.\n"
-    "مهم جدًا: كل كتابة النص الحر (summary, personal_note, event, how) بالعربية الفصحى —\n"
-    "أسماء المنصات والتطبيقات بالإنجليزية. summary جملة عربية واحدة موجزة.\n"
+    "Rules:\n"
+    "- confidence: 0 to 100. source: where the fact was found "
+    "(platform name / breach / PhoneInfoga / logical inference).\n"
+    "- phone_numbers and emails: extract ALL numbers and emails found "
+    "(including ones inside 'note', 'ids_data', registrations, breaches).\n"
+    "- aliases: every username / nickname found.\n"
+    "- social_accounts: one entry per platform found.\n"
+    "- risk_score 0-100, risk_level one of: low | medium | high.\n"
+    "- If a value is not present in the data, output an empty value with "
+    "confidence 0 — NEVER invent information.\n"
+    "- Write every free text (extra_info, summary-style values, event, how) "
+    "in Arabic. Platform names in English.\n"
+    "- The final JSON must be valid — no trailing commas.\n"
 )
 
 
@@ -226,6 +245,8 @@ async def generate_report(kind: str, query: str, data: dict, user_id: str = None
         report = _extract_json(content)
         if not isinstance(report, dict):
             raise AIError("النموذج لم يُرجع JSON صالحًا")
+        report = _normalize_report(report)
+        report["status"] = "ok"
     except Exception as e:
         LOG.warning("ai analysis failed: %s", e)
         used_model = ""
@@ -235,6 +256,73 @@ async def generate_report(kind: str, query: str, data: dict, user_id: str = None
     report["generated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     _cache_set(key, report)
     return report
+
+
+def _empty_field():
+    return {"value": "", "confidence": 0, "source": ""}
+
+
+def _normalize_report(report: dict) -> dict:
+    """تُوحّد البنية وتضمن كل الحقول النهائية (مع توافق مفاتيح قديمة)."""
+    r = dict(report or {})
+
+    def field_val(f):
+        if isinstance(f, dict):
+            return (f.get("value") or ""), (f.get("confidence") or 0), (f.get("source") or "")
+        return str(f or ""), 100, ""
+
+    name = r.get("full_name")
+    if not name and r.get("name"):
+        v, c, s = field_val(r["name"])
+        r["full_name"] = {"value": v, "confidence": c, "source": s}
+    age = r.get("age_estimate")
+    if not age and r.get("age"):
+        v, c, s = field_val(r["age"])
+        try:
+            r["age_estimate"] = {"value": int(v), "confidence": c, "source": s}
+        except (TypeError, ValueError):
+            r["age_estimate"] = {"value": v, "confidence": c, "source": s}
+    prof = r.get("profession")
+    if not prof and r.get("occupation"):
+        v, c, s = field_val(r["occupation"])
+        r["profession"] = {"value": v, "confidence": c, "source": s}
+    for key in ("full_name", "birth_date", "gender", "profession"):
+        if not r.get(key):
+            r[key] = _empty_field()
+    loc = r.get("location")
+    if not isinstance(loc, dict):
+        r["location"] = {"value": str(loc or ""), "city": "", "country": "",
+                         "confidence": 0, "source": ""}
+    else:
+        loc.setdefault("city", "")
+        loc.setdefault("country", "")
+        loc.setdefault("confidence", 0)
+        loc.setdefault("source", "")
+        loc.setdefault("value", "")
+    for key in ("phone_numbers", "emails", "aliases", "languages", "interests", "timeline"):
+        if not isinstance(r.get(key), list):
+            r[key] = []
+    accounts = r.get("social_accounts")
+    if not isinstance(accounts, list) and isinstance(r.get("accounts"), list):
+        accounts = r["accounts"]
+    if not isinstance(accounts, list):
+        accounts = []
+    r["social_accounts"] = [
+        {"platform": a.get("platform") or a.get("site") or "",
+         "username": a.get("username") or "",
+         "url": a.get("url") or ""}
+        for a in accounts[:60]
+    ]
+    if not isinstance(r.get("relationships"), list):
+        r["relationships"] = []
+    if not isinstance(r.get("summary"), str):
+        r["summary"] = ""
+    if not isinstance(r.get("extra_info"), str):
+        r["extra_info"] = ""
+    if not isinstance(r.get("risk_score"), (int, float)) or isinstance(r.get("risk_score"), bool):
+        r["risk_score"] = 0
+    r.setdefault("risk_level", "low")
+    return r
 
 
 def _extract_json(text: str):

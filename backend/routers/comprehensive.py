@@ -66,6 +66,8 @@ def comprehensive(kind: str, q: str = "", token: str = "", request: Request = No
         else:
             data = await phone_analysis.analyze_phone(raw, progress)
 
+        data["kind"] = kind  # رسم القسم الصحيح في الواجهة (email/phone ليسا افتراضيًا)
+
         for level, msg in notes:
             yield (level, msg)
 

@@ -17,14 +17,20 @@
 """
 import asyncio
 import logging
+import threading
+import time
 
 import config
 
 LOG = logging.getLogger("phone_analysis")
 
 _PLATFORM_TIMEOUT = 8   # ثانية لكل فحص ويب
+_CACHE_TTL = 1800       # كاش 30 دقيقة لنفس الرقم (تجنب إعادة الفحص)
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+
+_CACHE = {}
+_CACHE_LOCK = threading.Lock()
 
 
 def _country_name(country_code: str, lang: str = "ara") -> str:
@@ -182,31 +188,95 @@ async def _check_whatsapp(e164: str) -> dict:
 
 
 def _telegram_entry(e164: str) -> dict:
-    if config.TELEGRAM_API_ID and config.TELEGRAM_API_HASH and config.TELEGRAM_SESSION:
-        return {"platform": "telegram", "label": "Telegram", "status": "possible",
-                "url": f"tg://search?q={e164}", "icon": "telegram",
-                "note": "جلسة Telethon جاهزة — فحص من جهة الخادم"}
     return {"platform": "telegram", "label": "Telegram", "status": "link",
             "url": f"https://t.me/{e164.replace('+', '')}", "icon": "telegram",
             "note": "يتطلب جلسة (TELEGRAM_SESSION) للتأكيد التلقائي"}
 
 
+def _telegram_verify(e164: str, timeout: int = 20) -> dict:
+    """فحص حقيقي عبر Telethon (يتطلب TELEGRAM_API_ID/HASH/SESSION في البيئة)."""
+    try:
+        from telethon import TelegramClient
+        import telethon as _tl
+    except Exception as e:
+        return {"platform": "telegram", "label": "Telegram", "status": "link",
+                "url": f"https://t.me/{e164.replace('+', '')}", "icon": "telegram",
+                "note": f"Telethon غير مثبت: {e}"}
+
+    async def _run():
+        client = TelegramClient(
+            config.TELEGRAM_SESSION,
+            int(config.TELEGRAM_API_ID),
+            config.TELEGRAM_API_HASH,
+        )
+        await client.connect()
+        try:
+            await client.get_entity(e164)
+            return "registered"
+        except ValueError:
+            return "not_registered"
+        except _tl.errors.rpcerrorlist.UsernameNotOccupiedError:
+            return "not_registered"
+        except _tl.errors.rpcerrorlist.PhoneNumberInvalidError:
+            return "not_registered"
+        except Exception:
+            return "possible"
+        finally:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+
+    try:
+        status = asyncio.run(_run())
+    except Exception as e:
+        return {"platform": "telegram", "label": "Telegram", "status": "possible",
+                "url": f"https://t.me/{e164.replace('+', '')}", "icon": "telegram",
+                "note": f"فحص الجلسة تعثر: {e}"}
+    if status == "registered":
+        note = "الرقم مرتبط بحساب نشِط (تحقق Telethon)"
+    elif status == "not_registered":
+        note = "لا يوجد حساب Telegram بهذا الرقم"
+    else:
+        note = "حالة غير مؤكدة من الجلسة — تحقق يدويًا"
+    return {"platform": "telegram", "label": "Telegram", "status": status,
+            "url": f"https://t.me/{e164.replace('+', '')}", "icon": "telegram",
+            "note": note}
+
+
 def _search_links(e164: str) -> list:
-    q = e164.replace("+", "")
-    qq = "%22+%2B" + q + "+%22"
+    """روابط بحث موجهة لكل منصة (من الأهم للأقل) — بحث بالرقم داخل كل موقع."""
+    q = e164.replace("+", "")          # 966555123456
+    qq = q if q.startswith("0") else "+" + q   # +966555123456
+    search = f"https://www.google.com/search?q=%22{qq}%22"
+    site = lambda s: f"{search}+site%3A{s}"
     return [
-        {"platform": "snapchat", "label": "Snapchat", "status": "link",
-         "url": "https://www.snapchat.com/", "icon": "snapchat",
-         "note": "لا واجهة عامة للبحث بالرقم"},
-        {"platform": "discord", "label": "Discord", "status": "link",
-         "url": f"https://www.google.com/search?q=site%3Adiscord.com+%22%2B{q}%22",
-         "icon": "discord", "note": "بحث في سيرفرات مفهرسة عامة"},
+        # منصات التواصل الكبرى — بحث موجه بالرقم
         {"platform": "facebook", "label": "Facebook", "status": "link",
-         "url": f"https://www.facebook.com/search/top/?q=%2B{q}",
-         "icon": "facebook", "note": "بحث في الملفات العامة"},
-        {"platform": "google", "label": "Google", "status": "link",
-         "url": f"https://www.google.com/search?q={qq}",
-         "icon": "google", "note": "بحث عن الرقم في النصوص العامة"},
+         "url": f"https://www.facebook.com/search/top/?q=%22{qq}%22",
+         "icon": "facebook", "note": "البحث في الملفات العامة"},
+        {"platform": "instagram", "label": "Instagram — استرداد كلمة المرور", "status": "link",
+         "url": "https://www.instagram.com/accounts/password_reset/",
+         "icon": "instagram", "note": "تحقق يدوي: أدخل الرقم ليرى الموقع هل له حساب"},
+        {"platform": "instagram", "label": "Instagram — بحث بالرقم", "status": "link",
+         "url": site("instagram.com"),
+         "icon": "instagram", "note": "بحث في الملفات العامة المفهرسة"},
+        {"platform": "tiktok", "label": "TikTok", "status": "link",
+         "url": site("tiktok.com"),
+         "icon": "tiktok", "note": "بحث بالرقم داخل حسابات TikTok"},
+        {"platform": "snapchat", "label": "Snapchat", "status": "link",
+         "url": site("snapchat.com"),
+         "icon": "snapchat", "note": "بحث في الملفات العامة المفهرسة"},
+        {"platform": "twitter", "label": "X (Twitter)", "status": "link",
+         "url": f"{search}+(site%3Atwitter.com+OR+site%3Ax.com)",
+         "icon": "twitter", "note": "بحث بالرقم في تغريدات وحسابات"},
+        {"platform": "discord", "label": "Discord", "status": "link",
+         "url": site("discord.com"),
+         "icon": "discord", "note": "بحث في السيرفرات والأعضاء المفهرسة"},
+        {"platform": "telegram", "label": "Telegram — بحث بالرقم", "status": "link",
+         "url": site("t.me"),
+         "icon": "telegram", "note": "بحث بالرقم في الروابط العامة"},
+        # مواقع عربية
         {"platform": "haraj", "label": "Haraj (حراج)", "status": "link",
          "url": f"https://haraj.com.sa/search?q={q}",
          "icon": "haraj", "note": "حراج السعودية"},
@@ -214,22 +284,40 @@ def _search_links(e164: str) -> list:
          "url": f"https://www.opensooq.com/ar/find?q={q}",
          "icon": "opensooq", "note": "إعلانات السوق المفتوح العربية"},
         {"platform": "linkedin", "label": "LinkedIn", "status": "link",
-         "url": f"https://www.linkedin.com/search/results/all/?keywords=%2B{q}",
+         "url": f"https://www.linkedin.com/search/results/all/?keywords=%22{qq}%22",
          "icon": "linkedin", "note": "البحث في الملفات العامة"},
+        # محركات بحث عامة
+        {"platform": "google", "label": "Google", "status": "link",
+         "url": f"https://www.google.com/search?q=%22{q}%22",
+         "icon": "google", "note": "أي نص عام يعرض الرقم"},
+        {"platform": "google", "label": "Bing", "status": "link",
+         "url": f"https://www.bing.com/search?q=%22{q}%22",
+         "icon": "google", "note": "بحث منافس"},
+        {"platform": "duckduckgo", "label": "DuckDuckGo", "status": "link",
+         "url": f"https://duckduckgo.com/?q=%22{q}%22",
+         "icon": "duckduckgo", "note": "محرك شامل"},
     ]
 
 
 async def analyze_phone(raw: str, progress=None) -> dict:
-    """التحليل الشامل لرقم الهاتف: تقنيات + منصات + مواقع عربية."""
+    """التحليل الشامل لرقم الهاتف: تقنيات + منصات + مواقع عربية (مع كاش 30 دقيقة)."""
     if progress:
         progress("info", "جارٍ التحليل التقني الشامل للرقم…")
 
     parsed = parse_phone(raw)
     if parsed.get("error"):
-        return {"number": raw, "tech": None, "platforms": [], "arabic": [], "error": parsed["error"]}
+        return {"number": raw, "tech": None, "platforms": [], "error": parsed["error"]}
 
     tech = parsed["tech"]
     e164 = tech["e164"]
+
+    # كاش 30 دقيقة لنفس الرقم
+    with _CACHE_LOCK:
+        hit = _CACHE.get(e164)
+        if hit and time.time() - hit[0] < _CACHE_TTL:
+            if progress:
+                progress("info", "نتائج من فحص سابق (مخزنة 30 دقيقة)")
+            return hit[1]
 
     # دمج بيانات PhoneInfoga إن توفر (carrier/region/city إضافية)
     try:
@@ -249,10 +337,14 @@ async def analyze_phone(raw: str, progress=None) -> dict:
     except Exception as e:
         LOG.warning("phoneinfoga merge failed: %s", e)
 
-    # فحوص ويب متوازية
+    # فحوص ويب متوازية (Telegram عبر Telethon إن توفرت الجلسة في البيئة)
+    if config.TELEGRAM_API_ID and config.TELEGRAM_API_HASH and config.TELEGRAM_SESSION:
+        telegram = asyncio.to_thread(_telegram_verify, e164)
+    else:
+        telegram = asyncio.to_thread(lambda: _telegram_entry(e164))
     whatsapp, telegram = await asyncio.gather(
         _check_whatsapp(e164),
-        asyncio.to_thread(lambda: _telegram_entry(e164)),
+        telegram,
         return_exceptions=True,
     )
     if isinstance(whatsapp, Exception):
@@ -262,6 +354,10 @@ async def analyze_phone(raw: str, progress=None) -> dict:
     if isinstance(telegram, Exception):
         telegram = _telegram_entry(e164)
 
+    # الترتيب من الأهم للأقل: زيادة واتساب/تيليجرام أولًا ثم بقية المنصات
     platforms = [whatsapp, telegram] + _search_links(e164)
 
-    return {"number": e164, "tech": tech, "platforms": platforms, "error": None}
+    result = {"number": e164, "tech": tech, "platforms": platforms, "error": None}
+    with _CACHE_LOCK:
+        _CACHE[e164] = (time.time(), result)
+    return result

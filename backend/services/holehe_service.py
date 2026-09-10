@@ -51,6 +51,21 @@ def available() -> tuple:
         )
 
 
+_MODULE_COUNT = None
+
+
+def platform_count() -> int:
+    """عدد كل منصات holehe المدعومة فعليًا (≈121) — بدون تشغيل الفحص."""
+    global _MODULE_COUNT
+    if _MODULE_COUNT is None:
+        try:
+            from holehe.core import get_functions, import_submodules
+            _MODULE_COUNT = len(get_functions(import_submodules("holehe.modules")))
+        except Exception:
+            _MODULE_COUNT = 0
+    return _MODULE_COUNT
+
+
 # ---------------------------------------------------------------------------
 # كاش 24 ساعة
 # ---------------------------------------------------------------------------
@@ -221,7 +236,7 @@ async def search_email(email: str, progress=None) -> list:
         return cached
 
     if progress:
-        progress("info", "جارٍ فحص الإيميل على ~120 منصة (طلبات متوازية)…")
+        progress("info", f"جارٍ فحص الإيميل في {platform_count() or 120} منصة (طلبات متوازية)…")
 
     results = None
     try:

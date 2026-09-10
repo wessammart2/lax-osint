@@ -21,6 +21,7 @@ beautifulsoup4>=4.14.3,<5   # مطلوب من socid-extractor (تابع maigret)
 # التحليل الشامل للهاتف (تلقائي-مستقل) + استدعاءات OpenRouter
 phonenumbers>=9.0,<10.0   # تحليل تقني كامل + علم الدولة (بدون اتصال خارجي)
 requests>=2.31,<3.0       # OpenRouter chat + RDAP WHOIS
+dnspython>=2.6.0          # كشف مزوّد الإيميل عبر سجلات MX (Gmail/Outlook/Yahoo…)
 
 # أدوات إضافية اختيارية (تُفك تعليقها عند الحاجة فقط)
 # telethon>=1.36.0        # فحص Telegram برقم عبر جلسة (تتطلب TELEGRAM_* في env)
