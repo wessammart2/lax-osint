@@ -100,9 +100,18 @@ def popularity_key(name: str) -> int:
 
 
 def sort_results(items) -> list:
-    """ترتيب النتائج من الأشهر للأقل شهرة، مع استقرار الترتيب داخليًا."""
-    return sorted(items, key=lambda it: (popularity_key(it.get("site") or it.get("name") or ""),
-                                         _norm(it.get("site") or it.get("name") or "")))
+    """ترتيب النتائج: المسجلة أولًا ثم البقية، وداخل كل حالة من الأشهر للأقل شهرة."""
+    def _key(it):
+        name = it.get("site") or it.get("name") or ""
+        st = _norm(it.get("status") or "")
+        if st == "registered":
+            rank = 0
+        elif st == "not_registered":
+            rank = 1
+        else:
+            rank = 2
+        return (rank, popularity_key(name), _norm(name))
+    return sorted(items, key=_key)
 
 
 # ----------------------------------------------------------

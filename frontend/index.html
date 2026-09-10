@@ -60,7 +60,15 @@
     <span class="pulse"></span><span id="statusText" data-i18n="searching">جارٍ البحث…</span>
   </div>
 
-  <section id="log" class="hidden"></section>
+  <section id="log" class="hidden">
+    <div id="resWrap" class="res-wrap hidden">
+      <div class="res-counter" id="resCounter">
+        <span class="rc-loader" aria-hidden="true"></span>
+        <span><span data-i18n="foundResults">تم العثور على</span> <b id="resCount">0</b> <span data-i18n="resultsLabel">نتائج</span></span>
+      </div>
+      <div id="resultList"></div>
+    </div>
+  </section>
 
   <footer class="site">
     <div class="disclaimer" data-i18n="privacy">

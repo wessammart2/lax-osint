@@ -1,4 +1,4 @@
-/* LAX OSINT — تنفيذ البحث وبث النتائج عبر SSE + رسم البطاقات */
+/* LAX OSINT — تنفيذ البحث وبث النتائج عبر SSE + رسم البطاقات الاحترافية */
 (function () {
   "use strict";
 
@@ -9,8 +9,18 @@
     get status() { return document.getElementById("status"); },
     get statusText() { return document.getElementById("statusText"); },
     get log() { return document.getElementById("log"); },
+    get list() { return document.getElementById("resultList"); },
+    get resWrap() { return document.getElementById("resWrap"); },
+    get resCounter() { return document.getElementById("resCounter"); },
+    get resCount() { return document.getElementById("resCount"); },
   };
 
+  /* صورة بديلة (placeholder) لصورة البروفايل عند فشل تحميلها */
+  const AVATAR_PH = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="#1b1b1b"/>' +
+    '<circle cx="48" cy="34" r="15" fill="#555"/><path d="M26 82c2-18 12-27 22-27s20 9 22 27z" fill="#555"/></svg>');
+
+  /* ---------- أدوات ---------- */
   function letterFor(site) {
     const s = (site || "").replace(/[.-]/g, " ").trim();
     return s ? s[0].toUpperCase() : "?";
@@ -27,17 +37,107 @@
     return `<span class="chip ${c[0]}">${c[1]}</span>`;
   }
 
+  function statusClass(status) {
+    if (status === "registered") return "ok";
+    if (status === "not_registered") return "no";
+    if (status === "rate_limited" || status === "warning") return "warn";
+    return "err";
+  }
+
+  /* ---------- أيقونات المنصات (favicon من Google) ---------- */
+  const PLATFORM_DOMAINS = {
+    instagram: "instagram.com",
+    tiktok: "tiktok.com",
+    snapchat: "snapchat.com",
+    x: "x.com",
+    facebook: "facebook.com",
+    github: "github.com",
+    linkedin: "linkedin.com",
+    youtube: "youtube.com",
+    reddit: "reddit.com",
+    telegram: "t.me",
+    twitch: "twitch.tv",
+    pinterest: "pinterest.com",
+    discord: "discord.com",
+    whatsapp: "whatsapp.com",
+    steam: "steamcommunity.com",
+    spotify: "open.spotify.com",
+    soundcloud: "soundcloud.com",
+  };
+
+  function platformOf(site) {
+    const s = (site || "").toLowerCase().replace(/[^a-z0-9.]+/g, "");
+    if (s.includes("instagram")) return "instagram";
+    if (s.includes("tiktok")) return "tiktok";
+    if (s.includes("snapchat")) return "snapchat";
+    if (s.includes("twitter")) return "x";
+    if (s === "x" || s.includes("x.com")) return "x";
+    if (s.includes("facebook") || s === "fb") return "facebook";
+    if (s.includes("github")) return "github";
+    if (s.includes("linkedin")) return "linkedin";
+    if (s.includes("youtube")) return "youtube";
+    if (s.includes("reddit")) return "reddit";
+    if (s.includes("telegram")) return "telegram";
+    if (s.includes("twitch")) return "twitch";
+    if (s.includes("pinterest")) return "pinterest";
+    if (s.includes("discord")) return "discord";
+    if (s.includes("whatsapp")) return "whatsapp";
+    if (s.includes("steam")) return "steam";
+    if (s.includes("spotify")) return "spotify";
+    if (s.includes("soundcloud")) return "soundcloud";
+    return "";
+  }
+
+  function iconHtml(site, url) {
+    const p = platformOf(site) || (url ? hostOf(url) : "");
+    const letter = esc(letterFor(site));
+    if (p) {
+      const dom = PLATFORM_DOMAINS[p] || p;
+      return `<div class="plat-icon"><img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(dom)}&sz=64" alt="" loading="lazy" onerror="laxFbImg(this,'${letter}')"></div>`;
+    }
+    return `<div class="plat-icon letter">${letter}</div>`;
+  }
+
+  function hostOf(url) {
+    try { return new URL(url).hostname; } catch (e) { return ""; }
+  }
+
+  /* ---------- صورة البروفايل ---------- */
+  function avatarHtml(item) {
+    const u = item.avatar_url;
+    if (!u) return `<div class="site-avatar"><img src="${AVATAR_PH}" alt="" aria-hidden="true"></div>`;
+    return `<div class="site-avatar"><img src="${esc(u)}" alt="" loading="lazy" onerror="laxFbAvatar(this)"></div>`;
+  }
+
+  window.laxFbImg = function (img, letter) {
+    if (img.dataset.fb) return;
+    img.dataset.fb = "1";
+    const d = document.createElement("div");
+    d.className = "plat-icon letter";
+    d.textContent = letter;
+    img.replaceWith(d);
+  };
+
+  window.laxFbAvatar = function (img) {
+    if (img.dataset.fb) return;
+    img.dataset.fb = "1";
+    img.src = AVATAR_PH;
+  };
+
+  /* ---------- البطاقات ---------- */
   const Render = {
     site(item) {
       const url = item.url || "";
       const site = item.site || item.name || t("unknown");
-      return `<div class="card">
-        <div class="favicon">${letterFor(site)}</div>
+      const st = statusClass(item.status);
+      return `<div class="card site-card ${st}">
+        ${iconHtml(site, url)}
         <div class="meta">
           <div class="site">${esc(site)}</div>
           ${url ? `<div class="url"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></div>` : ""}
-          ${item.note ? `<div class="note-msg">${esc(item.note)}</div>` : ""}
+          ${item.note ? `<div class="note-txt">${esc(item.note)}</div>` : ""}
         </div>
+        ${avatarHtml(item)}
         ${chipFor(item.status)}
       </div>`;
     },
@@ -45,12 +145,13 @@
       const img = item.image_base64
         ? `<img class="avatar-img" src="${item.image_base64}" alt="avatar">`
         : `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer"><img class="avatar-img" src="${esc(item.url)}" alt="avatar"></a>`;
-      return `<div class="card avatar-card">
-        ${img}
+      return `<div class="card avatar-card ok">
+        <div class="plat-icon letter">🖼</div>
         <div class="meta">
           <div class="site">${t("avatarTitle")}</div>
           <div class="url">${item.hash || item.url || ""}</div>
         </div>
+        ${img}
         <span class="chip ok">${t("status_registered")}</span>
       </div>`;
     },
@@ -88,15 +189,28 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  /* تأثير الظهور المتتابع: كل بطاقة تتأخر 0.1 ثانية عن سابقتها */
+  function attachDelay(html, i) {
+    const d = Math.min(i, 8) * 100;
+    return html.replace(/<div class="([^"]+)"/, (m, c) => `<div class="${c}" style="animation-delay:${d}ms"`);
+  }
+
+  let insertIndex = 0;
+  let resultCount = 0;
+
   function renderType(type, data) {
     const fn = Render[type];
-    if (!fn) return "";
-    const html = fn(data);
-    els.log.insertAdjacentHTML("beforeend", html);
+    if (!fn) return;
+    els.list.insertAdjacentHTML("beforeend", attachDelay(fn(data), insertIndex++));
   }
 
   async function runSearch(type, query) {
-    els.log.innerHTML = "";
+    resultCount = 0;
+    insertIndex = 0;
+    els.list.innerHTML = "";
+    if (els.resCount) els.resCount.textContent = "0";
+    if (els.resCounter) els.resCounter.classList.remove("done");
+    if (els.resWrap) els.resWrap.classList.remove("hidden");
     els.log.classList.remove("hidden");
     els.status.classList.add("show");
     els.statusText.textContent = t("searching");
@@ -131,7 +245,6 @@
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
-    let doneCount = 0;
 
     try {
       while (true) {
@@ -149,6 +262,7 @@
       /* الشبكة انقطعت أثناء البث */
     } finally {
       els.status.classList.remove("show");
+      if (els.resCounter) els.resCounter.classList.add("done");
     }
   }
 
@@ -161,6 +275,11 @@
     return ev;
   }
 
+  function countResult() {
+    resultCount += 1;
+    if (els.resCount) els.resCount.textContent = resultCount;
+  }
+
   function handleBlock(ev) {
     if (!ev.data) return;
     let d = {};
@@ -169,23 +288,25 @@
     switch (ev.name) {
       case "meta":
         if (d.quota && window.laxUI) laxUI.setQuota(d.quota);
-        els.statusText.textContent = `${t("searching")} ${d.search_type ? "" : ""}`;
+        if (d.search_type) els.statusText.textContent = `${t("searching")} ${d.search_type}`;
         break;
       case "progress":
         els.statusText.textContent = d.step || t("searching");
         break;
       case "warn":
-        els.log.insertAdjacentHTML("beforeend", Render.warning(d.message || ""));
+        els.list.insertAdjacentHTML("beforeend", Render.warning(d.message || ""));
         break;
       case "result":
+        countResult();
         renderType(d.type, d.data);
         break;
       case "done":
-        doneCount = d.count || 0;
         els.statusText.textContent = `${t("done")}: ${d.count} (${d.duration} ${t("seconds")})`;
-        els.log.insertAdjacentHTML("beforeend",
-          `<div class="done-banner">✓ ${t("done")}: ${d.count} — ${d.duration} ${t("seconds")}</div>`);
-        if (doneCount === 0) els.log.insertAdjacentHTML("beforeend", `<div class="empty">${t("noResults")}</div>`);
+        if (d.count) {
+          els.list.insertAdjacentHTML("beforeend",
+            `<div class="done-banner">✓ ${t("done")}: ${d.count} — ${d.duration} ${t("seconds")}</div>`);
+        }
+        if (resultCount === 0) els.list.insertAdjacentHTML("beforeend", `<div class="empty">${t("noResults")}</div>`);
         break;
       default:
         renderType(ev.name, d); // fallback: أسماء أحداث تلائم أسماء البطاقات
@@ -194,7 +315,8 @@
 
   function fail(msg) {
     els.status.classList.remove("show");
-    els.log.insertAdjacentHTML("beforeend", `<div class="note-msg">✖ ${esc(msg)}</div>`);
+    if (els.resCounter) els.resCounter.classList.add("done");
+    els.list.insertAdjacentHTML("beforeend", `<div class="note-msg">✖ ${esc(msg)}</div>`);
   }
 
   window.laxSearch = { runSearch, esc };

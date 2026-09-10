@@ -1,7 +1,7 @@
 """LAX OSINT — راوتر البحث باليوزر نيم (Maigret) عبر SSE."""
 from fastapi import APIRouter, Request
 
-from services import maigret_service
+from services import maigret_service, profile_image_service
 from routers.search_common import authorize, stream_response
 from utils import sort_results
 
@@ -28,6 +28,7 @@ def username_search(q: str, token: str = "", request: Request = None):
 
         results = await maigret_service.search_username(query, progress)
         results = sort_results(results)
+        results = await profile_image_service.enrich(results)
         for level, msg in notes:
             yield (level, msg)
         for r in results:
