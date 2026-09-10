@@ -7,7 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/6.11.1/css/flag-icons.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/icons.css">
 </head>
 <body>
 
@@ -33,20 +36,21 @@
   <section class="search-box">
     <div class="tabs" id="tabs">
       <button class="tab active" data-type="username" data-ph="placeholder_username" data-help="help_username">
-        👤 <span data-i18n="username">يوزرنيم</span>
+        <i class="fa-solid fa-user tab-ic" aria-hidden="true"></i> <span data-i18n="username">يوزرنيم</span>
       </button>
       <button class="tab" data-type="email" data-ph="placeholder_email" data-help="help_email">
-        📧 <span data-i18n="email">إيميل</span>
+        <i class="fa-solid fa-envelope tab-ic" aria-hidden="true"></i> <span data-i18n="email">إيميل</span>
       </button>
       <button class="tab" data-type="phone" data-ph="placeholder_phone" data-help="help_phone">
-        📞 <span data-i18n="phone">رقم هاتف</span>
+        <i class="fa-solid fa-phone tab-ic" aria-hidden="true"></i> <span data-i18n="phone">رقم هاتف</span>
       </button>
     </div>
 
     <div class="input-row">
       <input id="query" type="text" autocomplete="off" spellcheck="false"
              placeholder="" aria-label="search query">
-      <button class="btn btn-primary" id="btnSearch" style="padding:14px 26px;">🔍 <span data-i18n="search">بحث</span></button>
+      <button class="btn btn-primary" id="btnSearch" style="padding:14px 26px;"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> <span data-i18n="search">بحث</span></button>
+      <button class="btn btn-outline deep-btn" id="btnComprehensive"><i class="fa-solid fa-brain" aria-hidden="true"></i> <span data-i18n="comprehensive">تحليل شامل</span></button>
     </div>
     <div class="help" id="searchHelp"></div>
 
@@ -65,6 +69,10 @@
       <div class="res-counter" id="resCounter">
         <span class="rc-loader" aria-hidden="true"></span>
         <span><span data-i18n="foundResults">تم العثور على</span> <b id="resCount">0</b> <span data-i18n="resultsLabel">نتائج</span></span>
+      </div>
+      <div class="comp-toolbar hidden" id="compToolbar">
+        <button class="btn btn-ghost" id="btnExportJson"><i class="fa-solid fa-code" aria-hidden="true"></i> <span data-i18n="exportJson">تصدير JSON</span></button>
+        <button class="btn btn-ghost" id="btnExportPdf"><i class="fa-solid fa-file-pdf" aria-hidden="true"></i> <span data-i18n="exportPdf">تصدير PDF</span></button>
       </div>
       <div id="resultList"></div>
     </div>
@@ -122,6 +130,7 @@
 <script src="js/i18n.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/search.js"></script>
+<script src="js/comprehensive_search.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

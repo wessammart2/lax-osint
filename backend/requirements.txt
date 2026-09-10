@@ -17,6 +17,12 @@ beautifulsoup4>=4.14.3,<5   # مطلوب من socid-extractor (تابع maigret)
 
 # PhoneInfoga يُنزَّل كـ binary رسمي في Dockerfile (غير متوفر على PyPI):
 #   github.com/sundowndev/phoneinfoga/releases (v2.11.0 Linux x86_64)
+
+# التحليل الشامل للهاتف (تلقائي-مستقل) + استدعاءات OpenRouter
+phonenumbers>=9.0,<10.0   # تحليل تقني كامل + علم الدولة (بدون اتصال خارجي)
+requests>=2.31,<3.0       # OpenRouter chat + RDAP WHOIS
+
 # أدوات إضافية اختيارية (تُفك تعليقها عند الحاجة فقط)
+# telethon>=1.36.0        # فحص Telegram برقم عبر جلسة (تتطلب TELEGRAM_* في env)
 # playwright>=1.49.1
 # facebook-scraper>=0.3.0

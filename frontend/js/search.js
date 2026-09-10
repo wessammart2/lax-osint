@@ -23,13 +23,13 @@
 
   function chipFor(status) {
     const map = {
-      registered: ["ok", t("status_registered")],
-      not_registered: ["no", t("status_not_registered")],
-      rate_limited: ["warn", t("status_rate_limited")],
-      warning: ["warn", t("status_warning")],
+      registered: ["ok", t("status_registered"), "fa-solid fa-circle-check"],
+      not_registered: ["no", t("status_not_registered"), "fa-solid fa-circle-xmark"],
+      rate_limited: ["warn", t("status_rate_limited"), "fa-solid fa-triangle-exclamation"],
+      warning: ["warn", t("status_warning"), "fa-solid fa-triangle-exclamation"],
     };
-    const c = map[status] || ["err", t("status_error")];
-    return `<span class="chip ${c[0]}">${c[1]}</span>`;
+    const c = map[status] || ["err", t("status_error"), "fa-solid fa-triangle-exclamation"];
+    return `<span class="chip ${c[0]}"><i class="${c[2]}" aria-hidden="true"></i> ${esc(c[1])}</span>`;
   }
 
   function statusClass(status) {
@@ -149,13 +149,13 @@
         ? `<img class="avatar-img" src="${item.image_base64}" alt="avatar">`
         : `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer"><img class="avatar-img" src="${esc(item.url)}" alt="avatar"></a>`;
       return `<div class="card avatar-card ok">
-        <div class="plat-icon letter">🖼</div>
+        <div class="plat-icon letter"><i class="fa-solid fa-image"></i></div>
         <div class="meta">
           <div class="site">${t("avatarTitle")}</div>
           <div class="url">${item.hash || item.url || ""}</div>
         </div>
         ${img}
-        <span class="chip ok">${t("status_registered")}</span>
+        <span class="chip ok"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${t("status_registered")}</span>
       </div>`;
     },
     phone_tech(item) {
@@ -173,7 +173,7 @@
       ].filter(([, v]) => v != null && v !== "");
       return `<div class="card dossier">
         <div class="meta">
-          <div class="site">📞 ${esc(item.number)}</div>
+          <div class="site"><i class="fa-solid fa-phone" aria-hidden="true"></i> ${esc(item.number)}</div>
           <div class="d-body">
             ${rows.map(([k, v]) => `<div class="kv"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}
           </div>
@@ -182,7 +182,7 @@
       </div>`;
     },
     warning(msg) {
-      return `<div class="note-msg">⚠️ ${esc(msg)}</div>`;
+      return `<div class="note-msg"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> ${esc(msg)}</div>`;
     },
   };
 
@@ -307,7 +307,7 @@
         els.statusText.textContent = `${t("done")}: ${d.count} (${d.duration} ${t("seconds")})`;
         if (d.count) {
           els.list.insertAdjacentHTML("beforeend",
-            `<div class="done-banner">✓ ${t("done")}: ${d.count} — ${d.duration} ${t("seconds")}</div>`);
+            `<div class="done-banner"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${t("done")}: ${d.count} — ${d.duration} ${t("seconds")}</div>`);
         }
         if (resultCount === 0) els.list.insertAdjacentHTML("beforeend", `<div class="empty">${t("noResults")}</div>`);
         break;
@@ -319,7 +319,7 @@
   function fail(msg) {
     els.status.classList.remove("show");
     if (els.resCounter) els.resCounter.classList.add("done");
-    els.list.insertAdjacentHTML("beforeend", `<div class="note-msg">✖ ${esc(msg)}</div>`);
+    els.list.insertAdjacentHTML("beforeend", `<div class="note-msg"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i> ${esc(msg)}</div>`);
   }
 
   window.laxSearch = { runSearch, esc };

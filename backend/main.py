@@ -40,7 +40,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 # ---------- راوترات ----------
-from routers import auth, pro, admin, username, email, phone  # noqa: E402
+from routers import auth, pro, admin, username, email, phone, comprehensive  # noqa: E402
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(pro.router, prefix="/api")
@@ -48,6 +48,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(username.router, prefix="/api")
 app.include_router(email.router, prefix="/api")
 app.include_router(phone.router, prefix="/api")
+app.include_router(comprehensive.router, prefix="/api")
 
 
 @app.get("/api/health")

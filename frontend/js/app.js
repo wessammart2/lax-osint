@@ -106,8 +106,8 @@
     if (A.isLoggedIn()) {
       const u = A.store.user || {};
       box.innerHTML = `
-        <span class="quota-chip${u.is_pro ? " pro" : ""}">${t("welcome")} ${escHtml(u.email || t("unknown"))}${u.is_pro ? " ⭐" : ""}</span>
-        <button class="btn btn-gold" id="btnPro">⚡ ${t("activatePro")}</button>
+        <span class="quota-chip${u.is_pro ? " pro" : ""}">${t("welcome")} ${escHtml(u.email || t("unknown"))}${u.is_pro ? ' <i class="fa-solid fa-star pro-star" aria-hidden="true"></i>' : ""}</span>
+        <button class="btn btn-gold" id="btnPro"><i class="fa-solid fa-bolt" aria-hidden="true"></i> ${t("activatePro")}</button>
         <button class="btn btn-ghost" id="btnLogout">${t("logout")}</button>`;
       document.getElementById("btnPro").onclick = () => openPro();
       document.getElementById("btnLogout").onclick = () => { A.logout(); toast(t("logout"), "info"); };

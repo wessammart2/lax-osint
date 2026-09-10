@@ -39,6 +39,25 @@ MAIGRET_BIN = os.getenv("MAIGRET_BIN", "maigret")
 HOLEHE_BIN = os.getenv("HOLEHE_BIN", "holehe")
 PHONEINFOGA_BIN = os.getenv("PHONEINFOGA_BIN", "phoneinfoga")
 
+# ---- التحليل الشامل (AI عبر OpenRouter) ----
+# المفاتيح تُقرأ من البيئة فقط — لا تُخزن في الواجهة أبدًا.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+HIBP_API_KEY = os.getenv("HIBP_API_KEY", "").strip()
+AI_MODELS = [m.strip() for m in
+             os.getenv("AI_MODELS",
+                       "meta-llama/llama-3-70b-instruct,"
+                       "google/gemma-2-27b-it,"
+                       "meta-llama/llama-3.1-8b-instruct:free")
+             .split(",") if m.strip()]
+AI_CACHE_HOURS = int(os.getenv("AI_CACHE_HOURS", "24"))
+AI_PER_USER_HOUR_LIMIT = int(os.getenv("AI_PER_USER_HOUR_LIMIT", "5"))
+AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "90"))
+
+# ---- فحص رقم الهاتف في Telegram (اختياري: يتطلب جلسة/session) ----
+TELEGRAM_API_ID = os.getenv("TELEGRAM_API_ID", "").strip()
+TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "").strip()
+TELEGRAM_SESSION = os.getenv("TELEGRAM_SESSION", "").strip()
+
 RATE_LIMIT_PER_IP = int(os.getenv("RATE_LIMIT_PER_IP", "20"))  # طلبًا/ساعة/IP
 RATE_LIMIT_WINDOW = 3600      # ثانية
 

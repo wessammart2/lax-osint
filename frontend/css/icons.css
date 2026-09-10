@@ -1,0 +1,259 @@
+/* LAX OSINT — أيقونات (Font Awesome / flag-icons) + لوحة التحليل الشامل
+   ================================================================ */
+
+/* محاذاة الأيقونات داخل الأزرار والشرائح */
+.btn i, .chip i, .tab i, .site-card i, .section-title i {
+  margin-inline-end: 6px;
+  vertical-align: -1px;
+}
+.tab i.tab-ic {
+  width: 15px;
+  text-align: center;
+  margin-inline-end: 7px;
+}
+
+.pro-star { color: var(--gold, #ffc107); }
+
+/* ---------- أعلى أدوات التصدير ---------- */
+.comp-toolbar {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin: 14px 0 6px;
+  flex-wrap: wrap;
+}
+.comp-toolbar.hidden { display: none; }
+.comp-toolbar .btn {
+  border: 1px solid var(--card-border, #333);
+  font-size: 12.5px;
+  padding: 8px 14px;
+  border-radius: 10px;
+}
+
+/* ---------- أنماط عامة داخل النتائج ---------- */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--gold, #ffc107);
+  margin: 20px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--card-border, #333);
+}
+.section-title i { color: var(--gold, #ffc107); }
+
+.flag { border-radius: 3px; box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
+
+.dossier .kv dd .fi { margin-inline-end: 6px; font-size: 15px; border-radius: 3px; }
+
+/* ---------- لوحة تقرير الذكاء الاصطناعي ---------- */
+.ai-panel {
+  border: 1px solid rgba(255,59,59,.45);
+  border-radius: 14px;
+  background: linear-gradient(165deg, #1c0d0d, var(--card, #121212));
+  padding: 4px 0 0;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.ai-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--card-border, #333);
+  flex-wrap: wrap;
+}
+.ai-head .ai-ic {
+  width: 42px; height: 42px;
+  display: grid; place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--red, #ff3b3b), #d32626);
+  color: #fff; font-size: 19px;
+  flex: none;
+}
+.ai-head h3 { font-size: 15.5px; font-weight: 800; margin: 0; }
+.ai-head .sub { font-size: 11.5px; color: var(--muted, #888); margin-top: 2px; }
+.ai-model {
+  margin-inline-start: auto;
+  font-size: 10.5px;
+  color: var(--muted, #888);
+  background: #141414;
+  border: 1px solid var(--card-border, #333);
+  padding: 4px 10px;
+  border-radius: 999px;
+  direction: ltr;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.ai-body { padding: 14px 16px; }
+
+.ai-summary {
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: var(--text, #e8e8e8);
+  background: rgba(255,59,59,.07);
+  border-inline-start: 3px solid var(--red, #ff3b3b);
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.ai-field {
+  background: #151515;
+  border: 1px solid var(--card-border, #333);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.ai-field .lbl {
+  font-size: 11px;
+  color: var(--muted, #888);
+  font-weight: 700;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.ai-field .lbl .conf { color: var(--gold, #ffc107); }
+.ai-field .val { font-size: 14px; font-weight: 700; word-break: break-word; }
+.ai-field .val.muted { color: var(--muted, #888); font-weight: 400; }
+
+.conf-bar {
+  height: 5px;
+  background: #222;
+  border-radius: 999px;
+  margin-top: 7px;
+  overflow: hidden;
+}
+.conf-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--red, #ff3b3b), var(--gold, #ffc107));
+  transition: width .6s ease;
+}
+
+/* ---------- مقياس المخاطر ---------- */
+.risk-wrap {
+  margin-top: 14px;
+  border-top: 1px dashed var(--card-border, #333);
+  padding-top: 12px;
+}
+.risk-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.risk-row b { font-size: 15px; }
+.risk-bar { height: 8px; border-radius: 999px; background: #222; overflow: hidden; }
+.risk-bar > span { display: block; height: 100%; border-radius: 999px; }
+.risk-low  .risk-bar > span { background: linear-gradient(90deg,#0f9d58,#2ecc71); }
+.risk-medium .risk-bar > span { background: linear-gradient(90deg,#f39c12,#ffc107); }
+.risk-high  .risk-bar > span { background: linear-gradient(90deg,#e74c3c,#ff3b3b); }
+.risk-low { border: 1px solid rgba(46,204,113,.4); background: rgba(46,204,113,.07); }
+.risk-medium { border: 1px solid rgba(255,193,7,.4); background: rgba(255,193,7,.07); }
+.risk-high { border: 1px solid rgba(255,59,59,.5); background: rgba(255,59,59,.08); }
+
+/* ---------- قوائم ---------- */
+.tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-list li {
+  list-style: none;
+  font-size: 12.5px;
+  background: #141414;
+  border: 1px solid var(--card-border, #333);
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--text, #e8e8e8);
+}
+.tag-list li i { color: var(--red, #ff3b3b); margin-inline-end: 6px; }
+
+.links-row { display: flex; flex-wrap: wrap; gap: 9px; }
+.links-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--red, #ff3b3b);
+  border: 1px solid rgba(255,59,59,.35);
+  background: rgba(255,59,59,.06);
+  padding: 7px 13px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.links-row a:hover { background: rgba(255,59,59,.16); }
+
+.sub-note {
+  font-size: 12px;
+  color: var(--muted, #888);
+  margin-top: 6px;
+  direction: ltr;
+  text-align: start;
+  word-break: break-all;
+}
+
+/* ---------- بطاقات الحسابات في التحليل الشامل ---------- */
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+.card.site-card.ok-comp {
+  border-inline-start: 3px solid var(--red, #ff3b3b);
+}
+.plat-ic {
+  font-size: 18px;
+  color: var(--red, #ff3b3b);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+}
+.plat-letter {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #141414;
+  color: var(--red, #ff3b3b);
+  font-weight: 900;
+  font-size: 15px;
+  flex: none;
+}
+.muted { color: var(--muted, #888); }
+
+/* بطاقة Gravatar/الإيميل في التحليل الشامل */
+.gv { display: flex; align-items: center; gap: 14px; }
+.gv .site { font-size: 15px; }
+.gv-avatar { flex: none; text-align: center; }
+.gv-avatar .site-avatar { width: 72px; height: 72px; }
+.gv-name { font-size: 12.5px; font-weight: 800; margin-top: 6px; color: var(--gold, #ffc107); }
+
+/* ---------- غلاف الطباعة ---------- */
+#printArea { display: block; }
+
+@media print {
+  body { background: #fff !important; }
+  .site, #status, .toast, .comp-toolbar, #btnExportJson, #btnExportPdf,
+  .tabs, .input-row, .quota-bar, #bgfx, .scrim, .topbtns { display: none !important; }
+  .wrap { max-width: 100%; padding: 0; }
+  .card { break-inside: avoid; background: #fff !important; border-color: #999 !important; color: #111 !important; }
+  .ai-panel { background: #fff !important; border-color: #999 !important; }
+  .ai-summary, .ai-field, .dossier, .site-card, .note-msg { background: #f6f6f6 !important; color: #111 !important; }
+  .site-card.ok, .ai-panel { border-color: #ccc !important; }
+  .section-title { color: #b10000 !important; }
+  .url a { color: #0044cc !important; }
+  .dossier .kv dd, .ai-field .val, .ai-summary { color: #111 !important; }
+  #log { display: block !important; }
+  .res-wrap.hidden { display: block !important; }
+}
