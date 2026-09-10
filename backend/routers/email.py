@@ -1,8 +1,8 @@
-"""LAX OSINT — راوتر البحث بالإيميل (holehe + Gravatar) عبر SSE."""
+"""LAX OSINT — راوتر البحث بالإيميل (holehe صارم + Gravatar) عبر SSE."""
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from services import gravatar_service, holehe_service
+from services import gravatar_service, holehe_service, profile_image_service
 from routers.search_common import authorize, stream_response
 from utils import sort_results
 
@@ -37,8 +37,16 @@ def email_search(q: str, token: str = "", request: Request = None):
         if avatar.get("available"):
             notes.append(("progress", {"message": "تم العثور على صورة Gravatar ✓"}))
 
-        # 3) holehe: التحقق من المنصات
+        # 3) holehe: التحقق الصارم من المنصات (نتائج مؤكدة فقط)
         results = await holehe_service.search_email(query, progress)
+        # 4) صورة البروفايل لكل نتيجة مؤكدة: صورة المنصة (إن وُجد اسم) وإلا Gravatar
+        results = await profile_image_service.enrich(results)
+        grav_url = avatar.get("url") if avatar.get("available") else gravatar_service.avatar_url(query)
+        for r in results:
+            if not r.get("avatar_url") and grav_url:
+                r["avatar_url"] = grav_url
+            r["platform"] = profile_image_service.platform_key(
+                r.get("site") or r.get("name") or "")
         results = sort_results(results)
         for level, msg in notes:
             yield (level, msg)

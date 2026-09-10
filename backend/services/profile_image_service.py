@@ -79,6 +79,11 @@ def _platform(site: str):
     return None
 
 
+def platform_key(name: str) -> str:
+    """الاسم القياسي للمنصة (instagram/twitter/…) أو '' إن لم تُعرف."""
+    return _platform(name) or ""
+
+
 def _extract(obj, keys) -> str:
     if isinstance(obj, dict):
         for k, v in obj.items():

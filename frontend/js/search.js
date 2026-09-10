@@ -15,11 +15,6 @@
     get resCount() { return document.getElementById("resCount"); },
   };
 
-  /* صورة بديلة (placeholder) لصورة البروفايل عند فشل تحميلها */
-  const AVATAR_PH = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect width="96" height="96" fill="#1b1b1b"/>' +
-    '<circle cx="48" cy="34" r="15" fill="#555"/><path d="M26 82c2-18 12-27 22-27s20 9 22 27z" fill="#555"/></svg>');
-
   /* ---------- أدوات ---------- */
   function letterFor(site) {
     const s = (site || "").replace(/[.-]/g, " ").trim();
@@ -102,11 +97,16 @@
     try { return new URL(url).hostname; } catch (e) { return ""; }
   }
 
-  /* ---------- صورة البروفايل ---------- */
+  /* ---------- صورة البروفايل (دائرية 64px + بديل ملون بلون المنصة) ---------- */
   function avatarHtml(item) {
     const u = item.avatar_url;
-    if (!u) return `<div class="site-avatar"><img src="${AVATAR_PH}" alt="" aria-hidden="true"></div>`;
-    return `<div class="site-avatar"><img src="${esc(u)}" alt="" loading="lazy" onerror="laxFbAvatar(this)"></div>`;
+    const p = item.platform || platformOf(item.site || item.name || "") || "";
+    const pcls = p ? " p-" + p : "";
+    const letter = esc(letterFor(item.site || item.name || p || "?"));
+    if (!u) {
+      return `<div class="site-avatar fall${pcls}"><div class="fb">${letter}</div></div>`;
+    }
+    return `<div class="site-avatar${pcls}"><img src="${esc(u)}" alt="" loading="lazy" onerror="laxFbAvatar(this,'${letter}')"></div>`;
   }
 
   window.laxFbImg = function (img, letter) {
@@ -118,10 +118,13 @@
     img.replaceWith(d);
   };
 
-  window.laxFbAvatar = function (img) {
+  window.laxFbAvatar = function (img, letter) {
     if (img.dataset.fb) return;
     img.dataset.fb = "1";
-    img.src = AVATAR_PH;
+    const d = document.createElement("div");
+    d.className = "fb";
+    d.textContent = letter || "?";
+    img.replaceWith(d);
   };
 
   /* ---------- البطاقات ---------- */
@@ -131,13 +134,13 @@
       const site = item.site || item.name || t("unknown");
       const st = statusClass(item.status);
       return `<div class="card site-card ${st}">
+        ${avatarHtml(item)}
         ${iconHtml(site, url)}
         <div class="meta">
           <div class="site">${esc(site)}</div>
           ${url ? `<div class="url"><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a></div>` : ""}
           ${item.note ? `<div class="note-txt">${esc(item.note)}</div>` : ""}
         </div>
-        ${avatarHtml(item)}
         ${chipFor(item.status)}
       </div>`;
     },

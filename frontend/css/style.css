@@ -259,18 +259,18 @@ footer.site .disclaimer { max-width: 640px; margin: 0 auto; padding: 12px 16px; 
   border-color: var(--red);
   box-shadow: 0 10px 30px rgba(255,59,59,.3);
 }
-.site-card.ok { border-inline-start: 3px solid var(--green); }
+.site-card.ok { border-color: rgba(255,59,59,.55); box-shadow: 0 4px 22px rgba(255,59,59,.22); }
 .site-card.no { border-inline-start: 3px solid #555; }
 .site-card.warn { border-inline-start: 3px solid #ffb84d; }
 .site-card.err { border-inline-start: 3px solid var(--red); }
 
 .plat-icon {
-  width: 42px; height: 42px; border-radius: 12px; overflow: hidden; flex: none;
+  width: 34px; height: 34px; border-radius: 10px; overflow: hidden; flex: none;
   background: #141414; border: 1px solid var(--card-border);
   display: grid; place-items: center;
 }
 .plat-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.plat-icon.letter { font-weight: 900; color: var(--red); font-size: 16px; }
+.plat-icon.letter { font-weight: 900; color: var(--red); font-size: 14px; }
 
 .site-card .meta { flex: 1; min-width: 0; }
 .site-card .meta .site { font-weight: 800; font-size: 14.5px; }
@@ -278,11 +278,35 @@ footer.site .disclaimer { max-width: 640px; margin: 0 auto; padding: 12px 16px; 
 .site-card .meta .url a:hover { text-decoration: underline; }
 .note-txt { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
 
+/* صورة البروفايل: دائرية 64px + بديل ملون بلون المنصة */
 .site-avatar {
-  width: 48px; height: 48px; border-radius: 12px; overflow: hidden; flex: none;
-  border: 1px solid var(--card-border); background: #141414;
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden; flex: none;
+  border: 2px solid var(--card-border); background: #141414;
+  display: grid; place-items: center;
 }
 .site-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.site-card.ok .site-avatar { border-color: rgba(0,255,136,.45); }
+.site-avatar .fb { width: 100%; height: 100%; display: grid; place-items: center;
+  color: #fff; font-weight: 800; font-size: 20px; }
+.site-card.ok .site-avatar { border-color: rgba(255,59,59,.55); }
 
-.avatar-card.ok { border-inline-start: 3px solid var(--green); }
+.site-avatar.p-instagram { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
+.site-avatar.p-tiktok { background: linear-gradient(135deg, #25F4EE 0%, #000 45%, #FE2C55 100%); }
+.site-avatar.p-snapchat { background: #FFFC00; }
+.site-avatar.p-snapchat .fb { color: #111; }
+.site-avatar.p-twitter, .site-avatar.p-x { background: #1D9BF0; }
+.site-avatar.p-facebook { background: #1877F2; }
+.site-avatar.p-github { background: #24292F; }
+.site-avatar.p-linkedin { background: #0A66C2; }
+.site-avatar.p-youtube { background: #FF0000; }
+.site-avatar.p-reddit { background: #FF4500; }
+.site-avatar.p-telegram { background: #229ED9; }
+.site-avatar.p-twitch { background: #9146FF; }
+.site-avatar.p-pinterest { background: #BD081C; }
+.site-avatar.p-discord { background: #5865F2; }
+.site-avatar.p-steam { background: #171A21; }
+.site-avatar.p-whatsapp { background: #25D366; }
+.site-avatar.p-spotify { background: #1DB954; }
+.site-avatar.p-soundcloud { background: #FF5500; }
+.site-avatar.p-google, .site-avatar.p-gravatar { background: linear-gradient(135deg, #4285F4, #EA4335 50%, #FBBC05 78%, #34A853); }
+
+.avatar-card.ok { border-inline-start: 3px solid var(--red); }
