@@ -72,11 +72,12 @@ async def _each(async_gen):
 _DONE = object()
 
 
-async def keepalive(agen, interval: int = 10):
-    """يحافظ على حيوية بث SSE أثناء المعالجات الطويلة بإرسال تعليق كل عدة ثوانٍ.
+async def keepalive(agen, interval: int = 4):
+    """يحافظ على حيوية بث SSE أثناء المعالجات الطويلة.
 
-    بعض الوكالات (Railway/Traefik) تقطع الاتصال إذا لم تُرسل وحدات بايت
-    لفترة؛ فهذه الدالة تضمن نبضًا دوريًا حتى انتهاء المولد الداخلي.
+    يرسل حدث heartbeat حقيقي (event: heartbeat) كل بضع ثوانٍ حتى لا تقطع
+    نفق Railway/Traefik الاتصال؛ بعض الوكالات لا تعيد توجيه أسطر التعليق
+    ("...") بينما تعيد توجيه أحداث SSE الحقيقية بموثوقية.
     """
     q: asyncio.Queue = asyncio.Queue()
     inner = agen()
@@ -96,7 +97,8 @@ async def keepalive(agen, interval: int = 10):
                 item = await asyncio.wait_for(q.get(), timeout=interval)
             except asyncio.TimeoutError:
                 if time.monotonic() - last >= interval:
-                    yield ": keep-alive\n\n"
+                    yield sse_event("heartbeat", {"t": int(time.time())})
+                    last = time.monotonic()
                 continue
             if item is _DONE:
                 break
